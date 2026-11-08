@@ -186,3 +186,11 @@ docker compose logs -f web
 - [`docs/architecture.md`](docs/architecture.md) —— 架构与请求流程
 - [`docs/design-system.md`](docs/design-system.md) —— 设计系统
 - [`docs/CONTRACT.md`](docs/CONTRACT.md) —— API/数据模型/权限/前端约定
+
+---
+
+## 9. 许可证
+
+本项目是基于 [New-API](https://github.com/QuantumNous/new-api) 的衍生作品，整体以 **GNU AGPL-3.0** 发布，详见 [`LICENSE`](LICENSE) 与 [`NOTICE`](NOTICE)。
+
+> 如果本项目作为面向公网的网络服务部署，需按 AGPL-3.0 向所有使用者提供完整对应源代码。
