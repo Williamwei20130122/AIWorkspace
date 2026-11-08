@@ -26,7 +26,7 @@ Go 1.27（net/http + modernc.org/sqlite，CGO_ENABLED=0）+ React 19 / Vite / TS
 
 ```sql
 users (
-  id TEXT PK, login_id TEXT UNIQUE NOT NULL,   -- 学号/工号
+  id TEXT PK, login_id TEXT UNIQUE NOT NULL,   -- 学号/用户名或 ID（教师为邮箱或手机号）
   name TEXT NOT NULL, role TEXT NOT NULL,      -- TEACHER | STUDENT | ADMIN
   password_hash TEXT,                          -- NULL = 无密码（学生默认）
   avatar_color TEXT NOT NULL DEFAULT '#0D9488',
@@ -112,11 +112,12 @@ evaluation_scores ( id TEXT PK, evaluation_id TEXT NOT NULL, dimension_id TEXT N
 ### 教师
 
 - `GET /api/teacher/overview` → `{topicCount, studentCount, pendingEvaluationCount, recentEvaluations:[{id, createdAt, comment, student:{id,name}, topic:{id,title}}], topics:[{id,title,status,memberCount,submissionCount,pendingCount}]}`
-- `GET /api/teacher/topics` → `[{id, title, status, joinMode, owner:{id,name}, isOwner, memberCount, submissionCount, pendingCount, updatedAt}]`
+- `GET /api/teacher/topics?page=1&pageSize=8&status=ALL|ACTIVE|CLOSED&keyword=xxx`
+  → 分页对象 `{ items: [{id, title, status, joinMode, owner:{id,name}, isOwner, memberCount, submissionCount, pendingCount, updatedAt}], total, page, pageSize, stats: {active, closed, pendingTotal} }`（pageSize 最大 50；keyword 匹配标题；stats 为该教师管理课题的全局统计，不随筛选变化）
 - `POST /api/teacher/topics` `{title, descriptionMd?}` → 201 `{id}`
 - `GET /api/teacher/topics/{id}` → `{id, title, descriptionMd, status, joinMode, owner:{id,name}, assistants:[{id,name,loginId}], students:[{id,name,loginId,hasPassword,removedAt}], dimensions:[{id,name,maxScore,sortOrder}], submissions:[{id, student:{id,name,loginId}, textContent, updatedAt, fileCount, evaluationCount, latestEvaluation:{id,comment,scores:[{dimensionId,dimensionName,score,maxScore}]}|null, pending}]}`
 - `PATCH /api/teacher/topics/{id}` `{title?, descriptionMd?, status?}` → 200
-- `POST /api/teacher/topics/{id}/assistants` `{loginId}` → 201（最多 3 个，超过 400）
+- `POST /api/teacher/topics/{id}/assistants` `{loginId}` → 201（最多 3 个，超过 400；`loginId` 支持教师的用户名（邮箱/手机号）或用户 ID）
 - `DELETE /api/teacher/topics/{id}/assistants/{teacherId}` → 204
 - `POST /api/teacher/topics/{id}/transfer` `{teacherId}` → 200（原创建者变为助教，需 ≤3 限制）
 - `POST /api/teacher/topics/{id}/students` `{loginId 或 studentId}` → 201（幂等；removed 的恢复）

@@ -75,7 +75,7 @@ export default function LoginPage() {
           </div>
 
           <h2 className="text-2xl font-semibold tracking-tight text-brand-900">登录</h2>
-          <p className="mt-1.5 text-sm text-ink-soft">使用老师分配的学号（或教师工号）登录</p>
+          <p className="mt-1.5 text-sm text-ink-soft">使用老师分配的学号，或教师的用户名 / ID 登录</p>
 
           <div className="mt-6">
             <LoginForm />

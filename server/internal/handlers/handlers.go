@@ -311,15 +311,15 @@ func (h *API) getMembership(ctx context.Context, topicID, studentID string) (*me
 /* 用户辅助                                                            */
 /* ------------------------------------------------------------------ */
 
-// getUserByLoginID 按学号 / 工号读取用户。
+// getUserByLoginID 按学号 / 用户名或 ID 读取用户（教师可用邮箱/手机号或用户 ID）。
 func (h *API) getUserByLoginID(ctx context.Context, loginID string) (*models.User, sql.NullString, error) {
 	var (
 		user         models.User
 		passwordHash sql.NullString
 	)
 	err := h.DB.QueryRowContext(ctx,
-		`SELECT id, login_id, name, role, avatar_color, password_hash FROM users WHERE login_id = ?`,
-		loginID,
+		`SELECT id, login_id, name, role, avatar_color, password_hash FROM users WHERE login_id = ? OR id = ?`,
+		loginID, loginID,
 	).Scan(&user.ID, &user.LoginID, &user.Name, &user.Role, &user.AvatarColor, &passwordHash)
 	if err != nil {
 		return nil, sql.NullString{}, err

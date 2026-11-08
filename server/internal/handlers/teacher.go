@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"aiworkspace/server/internal/auth"
@@ -140,15 +141,63 @@ func (h *API) topicStats(ctx context.Context, topicID string) (memberCount, subm
 	return memberCount, submissionCount, pendingCount, err
 }
 
-// TeacherTopics GET /api/teacher/topics。
+// TeacherTopics GET /api/teacher/topics?page=1&pageSize=8&status=ALL|ACTIVE|CLOSED&keyword=。
+// 返回分页对象 {items, total, page, pageSize}，供课题管理仪表盘/表格使用。
 func (h *API) TeacherTopics(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	ctx := r.Context()
+
+	query := r.URL.Query()
+	page := queryInt(query.Get("page"), 1, 1, 100000)
+	pageSize := queryInt(query.Get("pageSize"), 8, 1, 50)
+	status := strings.ToUpper(strings.TrimSpace(query.Get("status")))
+	keyword := strings.TrimSpace(query.Get("keyword"))
+
+	where := managedTopicsSQL
+	args := []any{user.ID, user.ID}
+	if status == statusActive || status == statusClosed {
+		where += " AND t.status = ?"
+		args = append(args, status)
+	}
+	if keyword != "" {
+		where += " AND t.title LIKE ?"
+		args = append(args, "%"+keyword+"%")
+	}
+
+	var total int
+	if err := h.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM topics t WHERE `+where, args...).Scan(&total); err != nil {
+		serverError(w, err)
+		return
+	}
+
+	stats := models.TopicStats{}
+	statsArgs := []any{user.ID, user.ID}
+	if err := h.DB.QueryRowContext(ctx,
+		`SELECT
+		   COALESCE(SUM(CASE WHEN t.status = ? THEN 1 ELSE 0 END), 0),
+		   COALESCE(SUM(CASE WHEN t.status = ? THEN 1 ELSE 0 END), 0)
+		 FROM topics t WHERE `+managedTopicsSQL,
+		statusActive, statusClosed, user.ID, user.ID,
+	).Scan(&stats.Active, &stats.Closed); err != nil {
+		serverError(w, err)
+		return
+	}
+	if err := h.DB.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM submissions s
+		 JOIN topics t ON t.id = s.topic_id
+		 WHERE `+managedTopicsSQL+`
+		   AND NOT EXISTS (SELECT 1 FROM evaluations e WHERE e.submission_id = s.id)`,
+		statsArgs...,
+	).Scan(&stats.PendingTotal); err != nil {
+		serverError(w, err)
+		return
+	}
 
 	type row struct {
 		ID, Title, Status, JoinMode, OwnerID, OwnerName, UpdatedAt string
 		MemberCount, SubmissionCount, PendingCount                 int
 	}
+	dataArgs := append(append([]any{}, args...), pageSize, (page-1)*pageSize)
 	rows, err := h.DB.QueryContext(ctx,
 		`SELECT t.id, t.title, t.status, t.join_mode, t.owner_id, COALESCE(ou.name, ''), t.updated_at,
 		   (SELECT COUNT(*) FROM topic_members m WHERE m.topic_id = t.id AND m.removed_at IS NULL),
@@ -156,8 +205,9 @@ func (h *API) TeacherTopics(w http.ResponseWriter, r *http.Request) {
 		   (SELECT COUNT(*) FROM submissions s WHERE s.topic_id = t.id AND NOT EXISTS (
 		      SELECT 1 FROM evaluations e WHERE e.submission_id = s.id))
 		 FROM topics t LEFT JOIN users ou ON ou.id = t.owner_id
-		 WHERE `+managedTopicsSQL+`
-		 ORDER BY t.updated_at DESC, t.id`, user.ID, user.ID)
+		 WHERE `+where+`
+		 ORDER BY t.updated_at DESC, t.id
+		 LIMIT ? OFFSET ?`, dataArgs...)
 	if err != nil {
 		serverError(w, err)
 		return
@@ -190,7 +240,22 @@ func (h *API) TeacherTopics(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, topics)
+	writeJSON(w, http.StatusOK, models.TeacherTopicPage{
+		Items:    topics,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+		Stats:    stats,
+	})
+}
+
+// queryInt 解析查询参数中的整数，非法或越界时返回 fallback。
+func queryInt(raw string, fallback, min, max int) int {
+	v, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || v < min || v > max {
+		return fallback
+	}
+	return v
 }
 
 // createTopicRequest POST /api/teacher/topics 请求体。
@@ -539,13 +604,13 @@ func (h *API) AddAssistant(w http.ResponseWriter, r *http.Request) {
 	}
 	loginID := strings.TrimSpace(req.LoginID)
 	if loginID == "" {
-		writeError(w, http.StatusBadRequest, "请输入教师工号")
+		writeError(w, http.StatusBadRequest, "请输入教师的用户名或 ID")
 		return
 	}
 	ctx := r.Context()
 	teacher, _, err := h.getUserByLoginID(ctx, loginID)
 	if errors.Is(err, sql.ErrNoRows) {
-		writeError(w, http.StatusNotFound, "教师不存在")
+		writeError(w, http.StatusNotFound, "教师不存在，请检查用户名或 ID")
 		return
 	}
 	if err != nil {

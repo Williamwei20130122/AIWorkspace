@@ -48,7 +48,7 @@ export function MemberManager({
     const loginId = assistantLoginId.trim();
     if (!loginId) {
       setAssistantSuccess(null);
-      setAssistantError("请填写助教的教师工号");
+      setAssistantError("请填写教师的用户名或 ID");
       return;
     }
     if (assistantFull) {
@@ -66,7 +66,7 @@ export function MemberManager({
       setAssistantSuccess("已添加助教");
       onChanged();
     } catch (err) {
-      setAssistantError(errorMessage(err, "添加助教失败，请检查工号是否正确"));
+      setAssistantError(errorMessage(err, "添加助教失败，请检查用户名或 ID 是否正确"));
     } finally {
       setAssistantPending(false);
     }
@@ -153,7 +153,7 @@ export function MemberManager({
 
         {topic.assistants.length === 0 ? (
           <p className="mt-2 rounded-lg border border-dashed border-line bg-white/60 px-3 py-3 text-xs text-ink-soft">
-            还没有助教。{isOwner ? "输入教师工号即可邀请一位。" : "创建者还没有邀请助教。"}
+            还没有助教。{isOwner ? "输入教师的用户名或 ID 即可邀请一位。" : "创建者还没有邀请助教。"}
           </p>
         ) : (
           <ul className="mt-2 space-y-1.5">
@@ -165,7 +165,7 @@ export function MemberManager({
                 <Avatar name={assistant.name} size="sm" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-brand-900">{assistant.name}</p>
-                  <p className="truncate text-xs text-ink-soft">工号 {assistant.loginId}</p>
+                  <p className="truncate text-xs text-ink-soft">账号 {assistant.loginId}</p>
                 </div>
                 {isOwner ? (
                   <Button
@@ -185,14 +185,14 @@ export function MemberManager({
 
         {isOwner ? (
           <form onSubmit={handleAddAssistant} className="mt-3 space-y-2" noValidate>
-            <Field label="添加助教" htmlFor="new-assistant-login" hint={`最多 ${MAX_ASSISTANTS} 名，输入教师的工号`}>
+            <Field label="添加助教" htmlFor="new-assistant-login" hint={`最多 ${MAX_ASSISTANTS} 名，输入教师的用户名或 ID`}>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Input
                   id="new-assistant-login"
                   name="loginId"
                   autoComplete="off"
-                  maxLength={40}
-                  placeholder="如：T002"
+                  maxLength={64}
+                  placeholder="如：teacher@example.com"
                   value={assistantLoginId}
                   disabled={assistantPending || assistantFull}
                   onChange={(event) => setAssistantLoginId(event.target.value)}

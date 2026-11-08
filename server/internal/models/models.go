@@ -105,6 +105,22 @@ type TeacherTopic struct {
 	UpdatedAt       string `json:"updatedAt"`
 }
 
+// TeacherTopicPage GET /api/teacher/topics 分页响应。
+type TeacherTopicPage struct {
+	Items    []TeacherTopic `json:"items"`
+	Total    int            `json:"total"`
+	Page     int            `json:"page"`
+	PageSize int            `json:"pageSize"`
+	Stats    TopicStats     `json:"stats"`
+}
+
+// TopicStats 课题管理仪表盘统计（不随筛选条件变化）。
+type TopicStats struct {
+	Active       int `json:"active"`
+	Closed       int `json:"closed"`
+	PendingTotal int `json:"pendingTotal"`
+}
+
 // TeacherTopicDetail GET /api/teacher/topics/{id} 响应。
 type TeacherTopicDetail struct {
 	ID            string                   `json:"id"`

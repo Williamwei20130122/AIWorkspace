@@ -33,6 +33,19 @@ export interface TopicSummary {
   updatedAt: string;
 }
 
+/** GET /api/teacher/topics 分页响应 */
+export interface TopicPage {
+  items: TopicSummary[];
+  total: number;
+  page: number;
+  pageSize: number;
+  stats: {
+    active: number;
+    closed: number;
+    pendingTotal: number;
+  };
+}
+
 export interface TopicStudent {
   id: string;
   name: string;

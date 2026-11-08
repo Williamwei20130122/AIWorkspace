@@ -151,7 +151,7 @@ await cdp(page.webSocketDebuggerUrl, async ({ send, once }) => {
   await shot("05-teacher-students", "/teacher/students");
   await shot("06-teacher-evaluations", "/teacher/evaluations");
   const teacherTopicId = await evaluate(
-    `fetch("/api/teacher/topics",{credentials:"same-origin"}).then(r=>r.json()).then(xs=>xs[0]&&xs[0].id)`,
+    `fetch("/api/teacher/topics?pageSize=1",{credentials:"same-origin"}).then(r=>r.json()).then(d=>(d.items&&d.items[0]&&d.items[0].id)||(Array.isArray(d)&&d[0]&&d[0].id))`,
   );
   if (teacherTopicId) await shot("04-teacher-topic-detail", `/teacher/topics/${teacherTopicId}`);
 
