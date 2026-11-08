@@ -22,7 +22,7 @@ export function EvaluationList({
                 to={`/student/topics/${item.topic.id}`}
                 className="text-sm font-semibold text-brand-900 transition-colors hover:text-brand-700"
               >
-                {item.topic.title}
+                {item.topic.name ?? item.topic.title ?? "课题"}
               </Link>
               <span className="text-xs text-ink-soft">{formatDateTime(item.createdAt)}</span>
             </div>

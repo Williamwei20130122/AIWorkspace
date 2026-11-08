@@ -133,9 +133,9 @@ export function AppShell({ user, children }: { user: User; children: ReactNode }
   };
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[256px_1fr]">
+    <div className="min-h-dvh lg:grid lg:h-dvh lg:grid-cols-[256px_1fr] lg:overflow-hidden">
       {/* 桌面侧栏 */}
-      <aside className="hidden border-r border-line bg-white lg:flex lg:h-dvh lg:flex-col lg:gap-6 lg:px-4 lg:py-5">
+      <aside className="hidden border-r border-line bg-white lg:flex lg:h-full lg:flex-col lg:gap-6 lg:px-4 lg:py-5">
         <BrandMark href={roleHome(user.role)} />
         <div className="flex-1 overflow-y-auto aw-scroll">
           <NavList items={items} pathname={pathname} />
@@ -187,7 +187,7 @@ export function AppShell({ user, children }: { user: User; children: ReactNode }
         </div>
       ) : null}
 
-      <main className="mx-auto w-full min-w-0 max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <main className="mx-auto w-full min-w-0 max-w-[1440px] px-4 py-6 sm:px-6 lg:h-dvh lg:overflow-y-auto lg:px-8 lg:py-8">
         {children}
       </main>
     </div>

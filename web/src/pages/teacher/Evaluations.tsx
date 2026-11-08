@@ -89,7 +89,7 @@ export default function TeacherEvaluations() {
                         to={`/teacher/topics/${evaluation.topic.id}`}
                         className="text-sm font-semibold text-brand-900 hover:text-brand-700"
                       >
-                        {evaluation.topic.title}
+                        {evaluation.topic.name ?? evaluation.topic.title ?? "课题"}
                       </Link>
                       <p className="mt-1 text-xs text-ink-soft">
                         学生 {evaluation.student.name} · 评价人 {evaluation.teacher?.name ?? "教师"}

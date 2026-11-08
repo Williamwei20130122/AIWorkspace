@@ -134,6 +134,18 @@ await cdp(page.webSocketDebuggerUrl, async ({ send, once }) => {
     console.log(`saved ${name}.png <- ${url}`);
   };
 
+  /** 滚动主区后截图，用于验证侧栏固定 */
+  const shotScrolled = async (name, url, top = 600) => {
+    await navigate(url);
+    await evaluate(
+      `(function(){var m=document.querySelector("main");if(m){m.scrollTop=${top};}return true;})()`,
+    );
+    await sleep(400);
+    const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+    fs.writeFileSync(path.join(OUT_DIR, `${name}.png`), Buffer.from(data, "base64"));
+    console.log(`saved ${name}.png <- ${url} (scrolled)`);
+  };
+
   // 登录页 / 注册页（未登录态）
   await send("Network.clearBrowserCookies");
   await navigate("/login");
@@ -153,7 +165,10 @@ await cdp(page.webSocketDebuggerUrl, async ({ send, once }) => {
   const teacherTopicId = await evaluate(
     `fetch("/api/teacher/topics?pageSize=1",{credentials:"same-origin"}).then(r=>r.json()).then(d=>(d.items&&d.items[0]&&d.items[0].id)||(Array.isArray(d)&&d[0]&&d[0].id))`,
   );
-  if (teacherTopicId) await shot("04-teacher-topic-detail", `/teacher/topics/${teacherTopicId}`);
+  if (teacherTopicId) {
+    await shot("04-teacher-topic-detail", `/teacher/topics/${teacherTopicId}`);
+    await shotScrolled("14-teacher-topic-detail-scrolled", `/teacher/topics/${teacherTopicId}`, 760);
+  }
 
   // v4：班级管理
   const teacherClassId = await evaluate(

@@ -245,7 +245,9 @@ export default function TeacherDashboard() {
                           {formatDateTime(evaluation.createdAt)}
                         </span>
                       </div>
-                      <p className="mt-0.5 truncate text-xs text-ink-soft">{evaluation.topic.title}</p>
+                      <p className="mt-0.5 truncate text-xs text-ink-soft">
+                        {evaluation.topic.name ?? evaluation.topic.title ?? "课题"}
+                      </p>
                       {evaluation.comment.trim() ? (
                         <p className="mt-1 line-clamp-2 whitespace-pre-line text-xs leading-5 text-ink-soft">
                           {evaluation.comment}

@@ -156,7 +156,7 @@ export interface EvaluationListItem {
   comment: string;
   teacher: { id: string; name: string };
   student: { id: string; name: string };
-  topic: { id: string; title: string };
+  topic: { id: string; name?: string; title?: string };
   submissionId: string;
   scores: EvaluationScore[];
 }
@@ -183,7 +183,7 @@ export interface MyEvaluationItem {
   id: string;
   createdAt: string;
   comment: string;
-  topic: { id: string; title: string };
+  topic: { id: string; name?: string; title?: string };
   scores: EvaluationScore[];
 }
 
