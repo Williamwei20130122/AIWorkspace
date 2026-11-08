@@ -204,6 +204,16 @@ type TeacherTopic struct {
 	UpdatedAt       string `json:"updatedAt"`
 }
 
+// AdminOverview GET /api/admin/overview 管理员总览统计。
+type AdminOverview struct {
+	TeacherCount    int `json:"teacherCount"`
+	StudentCount    int `json:"studentCount"`
+	ClassCount      int `json:"classCount"`
+	TopicCount      int `json:"topicCount"`
+	SubmissionCount int `json:"submissionCount"`
+	EvaluationCount int `json:"evaluationCount"`
+}
+
 // TeacherTopicPage GET /api/teacher/topics 分页响应。
 type TeacherTopicPage struct {
 	Items    []TeacherTopic `json:"items"`

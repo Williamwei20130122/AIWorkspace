@@ -70,5 +70,6 @@ export function initials(name: string): string {
 }
 
 export function roleHome(role: string): string {
-  return role === "TEACHER" || role === "ADMIN" ? "/teacher" : "/student";
+  if (role === "ADMIN") return "/admin";
+  return role === "TEACHER" ? "/teacher" : "/student";
 }

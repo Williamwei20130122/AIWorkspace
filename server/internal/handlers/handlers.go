@@ -101,6 +101,9 @@ func (h *API) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/teacher/topics/{id}/dimensions/{dimId}", h.Auth.RequireRole(roleTeacher, h.UpdateDimension))
 	mux.HandleFunc("DELETE /api/teacher/topics/{id}/dimensions/{dimId}", h.Auth.RequireRole(roleTeacher, h.DeleteDimension))
 
+	// 管理员（需 ADMIN）：启动时自动确保 admin 账号存在
+	mux.HandleFunc("GET /api/admin/overview", h.Auth.RequireRole(roleAdmin, h.AdminOverview))
+
 	mux.HandleFunc("GET /api/teacher/students", h.Auth.RequireRole(roleTeacher, h.TeacherStudents))
 	mux.HandleFunc("GET /api/teacher/students/lookup", h.Auth.RequireRole(roleTeacher, h.studentLookup))
 	mux.HandleFunc("POST /api/teacher/students", h.Auth.RequireRole(roleTeacher, h.CreateStudent))

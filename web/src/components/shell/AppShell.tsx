@@ -26,7 +26,10 @@ type NavItem = {
 };
 
 function navForRole(role: string): NavItem[] {
-  if (role === "TEACHER" || role === "ADMIN") {
+  if (role === "ADMIN") {
+    return [{ href: "/admin", label: "管理概览", icon: <IconDashboard />, exact: true }];
+  }
+  if (role === "TEACHER") {
     return [
       { href: "/teacher", label: "工作台", icon: <IconDashboard />, exact: true },
       { href: "/teacher/classes", label: "班级管理", icon: <IconSchool /> },

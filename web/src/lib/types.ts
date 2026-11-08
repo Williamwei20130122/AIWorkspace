@@ -267,3 +267,14 @@ export interface MyGroup {
 }
 
 export type SubmitMode = "INDIVIDUAL" | "GROUP";
+
+// ---------------- admin ----------------
+
+export interface AdminOverview {
+  teacherCount: number;
+  studentCount: number;
+  classCount: number;
+  topicCount: number;
+  submissionCount: number;
+  evaluationCount: number;
+}

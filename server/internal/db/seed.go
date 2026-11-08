@@ -14,6 +14,38 @@ import (
 // DemoPassword 演示账号统一密码。
 const DemoPassword = "demo1234"
 
+// 管理员账号：启动时通过 EnsureAdmin 幂等创建（已有则不修改密码）。
+// 密码由部署方持有，不在 README / 记忆库中公开。
+const (
+	AdminLoginID  = "admin"
+	AdminPassword = "CloUD123456!=CLUD"
+)
+
+// EnsureAdmin 确保存在管理员账号（role=ADMIN）。已存在则不做任何修改。
+func EnsureAdmin(db *sql.DB) error {
+	var count int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM users WHERE login_id = ?`, AdminLoginID).Scan(&count); err != nil {
+		return fmt.Errorf("检查管理员账号失败: %w", err)
+	}
+	if count > 0 {
+		return nil
+	}
+	hash, err := auth.HashPassword(AdminPassword)
+	if err != nil {
+		return fmt.Errorf("生成管理员密码失败: %w", err)
+	}
+	now := FormatTime(time.Now().UTC())
+	_, err = db.Exec(
+		`INSERT INTO users (id, login_id, name, role, password_hash, avatar_color, created_by, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+		NewID("u"), AdminLoginID, "管理员", "ADMIN", hash, "#0D9488", now, now,
+	)
+	if err != nil {
+		return fmt.Errorf("创建管理员账号失败: %w", err)
+	}
+	return nil
+}
+
 // Seed 在 users 表为空时写入 v4 演示数据；返回是否真正写入了数据。
 //
 // 演示数据与 docs/CONTRACT.md 第 10.5 节（v4）保持一致：

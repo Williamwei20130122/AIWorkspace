@@ -76,6 +76,11 @@ func main() {
 		log.Printf("SEED_ON_START 已关闭，跳过演示数据")
 	}
 
+	// ---------- 管理员账号（幂等，任何库结构下都确保存在） ----------
+	if err := db.EnsureAdmin(database); err != nil {
+		log.Printf("确保管理员账号失败：%v", err)
+	}
+
 	// ---------- 路由 ----------
 	authenticator := auth.New(database, secret, secureCookie)
 	api := handlers.New(database, authenticator, uploadDir)

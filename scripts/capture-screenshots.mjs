@@ -162,6 +162,12 @@ await cdp(page.webSocketDebuggerUrl, async ({ send, once }) => {
   await shot("03-teacher-topics", "/teacher/topics");
   await shot("05-teacher-students", "/teacher/students");
   await shot("06-teacher-evaluations", "/teacher/evaluations");
+
+  // 管理员（密码通过 CAPTURE_ADMIN_PASSWORD 传入，不写入仓库）
+  if (process.env.CAPTURE_ADMIN_PASSWORD) {
+    await login("admin", process.env.CAPTURE_ADMIN_PASSWORD);
+    await shot("15-admin-dashboard", "/admin");
+  }
   const teacherTopicId = await evaluate(
     `fetch("/api/teacher/topics?pageSize=1",{credentials:"same-origin"}).then(r=>r.json()).then(d=>(d.items&&d.items[0]&&d.items[0].id)||(Array.isArray(d)&&d[0]&&d[0].id))`,
   );

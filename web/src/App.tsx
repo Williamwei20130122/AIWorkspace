@@ -4,6 +4,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { roleHome } from "@/lib/format";
 import LoginPage from "@/pages/Login";
 import RegisterPage from "@/pages/Register";
+import AdminDashboard from "@/pages/admin/Dashboard";
 import TeacherDashboard from "@/pages/teacher/Dashboard";
 import TeacherClasses from "@/pages/teacher/Classes";
 import TeacherClassDetail from "@/pages/teacher/ClassDetail";
@@ -115,6 +116,15 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute role="ADMIN">
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/student/classes"
         element={
