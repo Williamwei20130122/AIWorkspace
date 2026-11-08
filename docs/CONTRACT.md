@@ -151,14 +151,14 @@ evaluation_scores ( id TEXT PK, evaluation_id TEXT NOT NULL, dimension_id TEXT N
 
 ## 8. 种子数据（SEED_ON_START=1 且 users 为空）
 
-- 教师：`王老师` loginId `T001` 密码 `demo1234`；`李老师` loginId `T002` 密码 `demo1234`。
+- 教师：`王老师` loginId `teacher@demo.edu` 密码 `demo1234`；`李老师` loginId `li@demo.edu` 密码 `demo1234`（教师用邮箱/手机号）。
 - 学生：`李小明` `S001`（无密码）、`张小红` `S002` 密码 `demo1234`、`陈小军` `S003`（无密码）、`刘小美` `S004`（无密码）。
 - 课题 1「校园气象站数据记录」owner 王老师、助教 李老师、成员 S001/S002/S003、状态 ACTIVE、介绍页 Markdown；维度：数据完整性/分析质量/规范表达（各 100）。
 - 课题 2「班级图书角运营方案」owner 王老师、成员 S001/S004、状态 ACTIVE。
 - 课题 3「校园植物观察（已结题）」owner 王老师、成员 S002（removed_at 有值，用于历史展示）、状态 CLOSED。
 - 提交：课题1 S001（文本+2 个演示附件）、S002（文本，无附件）；课题3 S002（文本）。
 - 评价：课题1 S001 的评价（3 维度 + 评语）、课题3 S002 的评价。
-- 演示登录：教师 `T001/demo1234`；学生 `S001`（无密码直接进）。
+- 演示登录：教师 `teacher@demo.edu / demo1234`；学生 `S001`（无密码直接进）。
 
 ## 9. Docker
 
