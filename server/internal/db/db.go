@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,7 +74,14 @@ func sqliteDSN(path string) string {
 }
 
 // Migrate 执行内嵌 schema.sql 建表（每条语句单独执行，可重复调用）。
+//
+// v2（班级 / 任务模型）与本版本的 users 表结构不兼容，因此在建表前先检测
+// 旧库：若 users 表存在但没有 login_id 列，说明是 v2 数据库，直接丢弃旧
+// 业务表后按 v3 重建（v3 是一次产品模型重构，旧数据无法无损迁移）。
 func Migrate(db *sql.DB) error {
+	if err := dropLegacySchema(db); err != nil {
+		return err
+	}
 	for _, stmt := range strings.Split(schemaSQL, ";") {
 		stmt = strings.TrimSpace(stmt)
 		if stmt == "" {
@@ -84,6 +92,80 @@ func Migrate(db *sql.DB) error {
 		}
 	}
 	return nil
+}
+
+// legacyTables 是 v2 及 v3 可能出现的全部表名，按“子表在前”的顺序重建。
+var legacyTables = []string{
+	"evaluation_scores",
+	"evaluation_dimensions",
+	"evaluations",
+	"submission_files",
+	"topic_members",
+	"topic_assistants",
+	"submissions",
+	"topics",
+	"teacher_students",
+	"announcements",
+	"assignments",
+	"courses",
+	"enrollments",
+	"classes",
+	"users",
+}
+
+// dropLegacySchema 检测 v2 数据库并清理旧表；全新库 / 已是 v3 时不做任何事。
+func dropLegacySchema(db *sql.DB) error {
+	var tableCount int
+	if err := db.QueryRow(
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'users'`,
+	).Scan(&tableCount); err != nil {
+		return fmt.Errorf("检查数据库结构失败: %w", err)
+	}
+	if tableCount == 0 {
+		return nil
+	}
+
+	hasLoginID, err := tableHasColumn(db, "users", "login_id")
+	if err != nil {
+		return err
+	}
+	if hasLoginID {
+		return nil
+	}
+
+	log.Printf("检测到 v2（班级 / 任务模型）数据库结构，按 v3 契约重建数据表（旧数据不会保留）")
+	for _, table := range legacyTables {
+		if _, err := db.Exec("DROP TABLE IF EXISTS " + table); err != nil {
+			return fmt.Errorf("清理旧表 %s 失败: %w", table, err)
+		}
+	}
+	return nil
+}
+
+// tableHasColumn 判断表是否存在指定列。
+func tableHasColumn(db *sql.DB, table, column string) (bool, error) {
+	rows, err := db.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return false, fmt.Errorf("读取表 %s 结构失败: %w", table, err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var (
+			cid          int
+			name         string
+			columnType   string
+			notNull      int
+			defaultValue any
+			pk           int
+		)
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &pk); err != nil {
+			return false, fmt.Errorf("解析表 %s 结构失败: %w", table, err)
+		}
+		if name == column {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 
 // NewID 生成带前缀的随机 id（cuid 风格，24 位十六进制随机串）。

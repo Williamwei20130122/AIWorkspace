@@ -2,11 +2,14 @@
 
 export class ApiError extends Error {
   status: number;
+  /** 服务端返回的 JSON 体（如 409 的 conflict 字段） */
+  data?: unknown;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, data?: unknown) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.data = data;
   }
 }
 
@@ -24,6 +27,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     credentials: "same-origin",
   });
 
+  return parseResponse<T>(res);
+}
+
+async function parseResponse<T>(res: Response): Promise<T> {
   if (res.status === 401) {
     if (window.location.pathname !== "/login") {
       window.location.assign("/login");
@@ -43,7 +50,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   if (!res.ok) {
     const message = (data as { error?: string } | null)?.error ?? `请求失败（${res.status}）`;
-    throw new ApiError(message, res.status);
+    throw new ApiError(message, res.status, data);
   }
 
   return data as T;
@@ -52,6 +59,18 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: "POST", body }),
+  patch: <T>(path: string, body?: unknown) => request<T>(path, { method: "PATCH", body }),
+  put: <T>(path: string, body?: unknown) => request<T>(path, { method: "PUT", body }),
+  del: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  /** 文件上传：multipart/form-data，不要手动设置 Content-Type */
+  upload: async <T>(path: string, formData: FormData): Promise<T> => {
+    const res = await fetch(path, {
+      method: "POST",
+      body: formData,
+      credentials: "same-origin",
+    });
+    return parseResponse<T>(res);
+  },
 };
 
 /** 页面里统一取错误文案 */

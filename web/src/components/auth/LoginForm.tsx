@@ -9,12 +9,12 @@ import { roleHome } from "@/lib/format";
 import type { User } from "@/lib/types";
 
 const DEMO_ACCOUNTS = [
-  { label: "教师演示账号", email: "teacher@demo.edu", password: "demo1234" },
-  { label: "学生演示账号", email: "student@demo.edu", password: "demo1234" },
+  { label: "教师演示账号", loginId: "teacher@demo.edu", password: "demo1234" },
+  { label: "学生演示账号（无密码）", loginId: "S001", password: "" },
 ];
 
 export function LoginForm() {
-  const [email, setEmail] = useState("");
+  const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -26,11 +26,14 @@ export function LoginForm() {
     setPending(true);
     setError(null);
     try {
-      const data = await api.post<{ user: User }>("/api/auth/login", { email, password });
+      const data = await api.post<{ user: User }>("/api/auth/login", {
+        loginId: loginId.trim(),
+        password,
+      });
       setUser(data.user);
       navigate(roleHome(data.user.role), { replace: true });
     } catch (err) {
-      setError(errorMessage(err, "登录失败，请检查邮箱和密码"));
+      setError(errorMessage(err, "登录失败，请检查学号或密码"));
     } finally {
       setPending(false);
     }
@@ -39,26 +42,25 @@ export function LoginForm() {
   return (
     <div className="space-y-5">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Field label="邮箱" htmlFor="email">
+        <Field label="账号" htmlFor="loginId" hint="教师用邮箱或手机号，学生用老师给的学号">
           <Input
-            id="email"
-            name="email"
-            type="email"
+            id="loginId"
+            name="loginId"
+            type="text"
             required
-            autoComplete="email"
-            placeholder="you@school.edu"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            autoComplete="username"
+            placeholder="teacher@school.edu / 13800000000 / S001"
+            value={loginId}
+            onChange={(event) => setLoginId(event.target.value)}
           />
         </Field>
-        <Field label="密码" htmlFor="password">
+        <Field label="密码" htmlFor="password" hint="学生账号可能没有密码，留空即可登录">
           <Input
             id="password"
             name="password"
             type="password"
-            required
             autoComplete="current-password"
-            placeholder="请输入密码"
+            placeholder="无密码可留空"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
@@ -74,10 +76,10 @@ export function LoginForm() {
         <div className="mt-2 flex flex-wrap gap-2">
           {DEMO_ACCOUNTS.map((account) => (
             <button
-              key={account.email}
+              key={account.loginId}
               type="button"
               onClick={() => {
-                setEmail(account.email);
+                setLoginId(account.loginId);
                 setPassword(account.password);
               }}
               className="rounded-lg border border-brand-200 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-100"
@@ -87,7 +89,7 @@ export function LoginForm() {
           ))}
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">
-          教师 teacher@demo.edu · 学生 student@demo.edu · 密码均为 demo1234
+          教师 teacher@demo.edu / demo1234 · 学生 S001（默认无密码）· 学生 S002 / demo1234
         </p>
       </div>
     </div>

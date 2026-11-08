@@ -1,48 +1,55 @@
-# AIWorkspace · 教学系统（Go 后端 + TS 前端）
+# AIWorkspace · 教学系统（课题 · 提交 · 评价）
 
-面向学校 **教师** 与 **学生** 的轻量网页教学系统：班级与成员、课程、作业发布与提交、批改与成绩、班级公告。
+面向学校 **教师** 与 **学生** 的轻量网页教学系统：老师创建课题、管理学生与助教；学生用学号进入，提交作品（文本 + 任意文件）；老师进行多维度评分与文字评价。
 
 技术栈：**Go 1.27**（标准库 HTTP + 纯 Go SQLite）+ **React 19 / Vite / TypeScript / Tailwind CSS v4**；单容器 Docker 部署，宿主机 **3100 端口** 访问。
 
 > Git 远端：`https://github.com/Williamwei20130122/AIWorkspace`
-> Next.js 全栈版基底保留在 `feat/project-base` 分支（v1），当前主线为 `feat/go-ts`。
+> 历史版本：v1 Next.js 全栈在 `feat/project-base`；v2 班级/作业模型在 `feat/go-ts`；当前 v3 在 `feat/topic-model`。
 
 ---
 
-## 1. 功能一览
+## 1. 产品模型
+
+**课题（Topic）→ 提交（Submission）→ 评价（Evaluation）**
 
 ### 教师端
 
-- 工作台：班级数 / 学生数 / 课程数 / 待批改统计，最近提交与即将截止作业
-- 班级管理：创建班级（自动生成 6 位邀请码）、查看学生名单
-- 课程管理：在班级下建课
-- 作业：发布作业（标题、要求、分值、截止时间）、查看提交进度、逐份批改打分与评语
-- 公告：向班级发布通知
+- **账号**：用**邮箱或手机号**注册 / 登录（自助注册）
+- **课题**：创建课题、编辑介绍页（支持 Markdown）、关闭/恢复课题
+- **协作**：邀请**最多 3 名助教**共同管理；创建者权限**可移交**
+- **学生管理**：创建学生账号（姓名 + 默认用户名）；学生可被多位老师管理；
+  - 用户名冲突时先展示已有账号信息，由老师判断「同一个人 → 加入我的管理」或「不同人 → 换用户名重新创建」
+  - 可重置 / 关闭学生密码，但**永远看不到明文**
+- **成员**：把学生加入/移出课题（学生被动加入，不能自行进出；移出后保留历史）
+- **评价**：自定义课题的**多维评分维度** + 文字评语；一个提交可多次评价、保留历史
+- **评价汇总**：查看自己课题下的全部评价
 
 ### 学生端
 
-- 工作台：待交作业 / 已提交 / 平均分 / 班级数，最近公告
-- 加入班级：凭 6 位邀请码
-- 作业：查看作业要求与截止时间、提交 / 重新提交
-- 成绩：查看已批改作业的得分、百分比与教师评语
+- **登录**：老师分配的**默认用户名（学号）**直接登录，默认无密码；可自行设置/清除密码
+- **我的课题**：当前课题 + 曾经加入过的历史课题
+- **课题介绍页**：Markdown 渲染
+- **提交**：文本（原样展示，不渲染 Markdown/LaTeX）+ 任意类型文件多文件上传；可重新提交
+- **已评价锁定**：老师评价后不能重新提交（防篡改）
+- **我的评价**：查看自己全部历史评价（多维得分 + 评语）
 
 ### 演示账号（首次启动自动创建）
 
-| 角色 | 邮箱 | 密码 |
+| 角色 | 账号 | 密码 |
 | --- | --- | --- |
 | 教师 | `teacher@demo.edu` | `demo1234` |
-| 学生 | `student@demo.edu` | `demo1234` |
-
-其他演示学生：`xiaohong@demo.edu` / `xiaojun@demo.edu` / `xiaomei@demo.edu`，密码相同。
-班级邀请码：`MATH01`、`MATH02`。
+| 教师（助教） | `li@demo.edu` | `demo1234` |
+| 学生 | `S001`（李小明） | 无密码，直接登录 |
+| 学生 | `S002`（张小红） | `demo1234` |
 
 ### 界面预览
 
-| 登录 | 教师工作台 | 学生成绩单 |
+| 登录 | 教师工作台 | 学生课题 |
 | --- | --- | --- |
-| ![登录页](docs/screenshots/01-login.png) | ![教师工作台](docs/screenshots/02-teacher-dashboard.png) | ![学生成绩单](docs/screenshots/10-student-grades.png) |
+| ![登录页](docs/screenshots/01-login.png) | ![教师工作台](docs/screenshots/02-teacher-dashboard.png) | ![学生课题](docs/screenshots/07-student-dashboard.png) |
 
-更多截图在 [`docs/screenshots/`](docs/screenshots/)，由 `node scripts/capture-screenshots.mjs` 自动生成。
+截图在 [`docs/screenshots/`](docs/screenshots/)，由 `node scripts/capture-screenshots.mjs` 自动生成。
 
 ---
 
@@ -52,8 +59,8 @@
 | --- | --- |
 | 后端 | Go 1.27，`net/http` 路由；`modernc.org/sqlite`（纯 Go，无需 CGO） |
 | 前端 | React 19 + Vite + TypeScript strict + Tailwind CSS v4 + React Router 7 |
-| 认证 | scrypt 口令哈希 + HMAC-SHA256 签名 HttpOnly Cookie（`aw_session`） |
-| 数据 | SQLite 文件：本地 `server/data/app.db`，容器 `/data/app.db`；启动自动建表 |
+| 认证 | scrypt 口令哈希 + HMAC-SHA256 签名 HttpOnly Cookie（`aw_session`）；学生账号可无密码 |
+| 数据 | SQLite：本地 `server/data/app.db`，容器 `/data/app.db`；上传文件 `uploads/` |
 | 部署 | Docker 多阶段：Vite 构建 → Go 构建（`go:embed` 内嵌前端）→ alpine |
 
 ```
@@ -65,11 +72,11 @@ server/                    Go 后端
   internal/models/         JSON 结构体
   webdist/                 go:embed 的前端产物（构建时由 web/dist 覆盖）
 web/                       Vite + React 前端
-  src/pages/               页面（teacher/、student/、Login）
+  src/pages/               页面（teacher/、student/、Login、Register）
   src/components/          ui、shell、auth、teacher、student
   src/lib/                 api、types、format、roles
 docs/                      需求、架构、设计系统、开发契约、截图
-scripts/                   截图等开发脚本
+scripts/                   本地启动、截图等开发脚本
 Dockerfile / docker-compose.yml
 ```
 
@@ -81,13 +88,13 @@ Dockerfile / docker-compose.yml
 
 ### 后端（:3100）
 
-```bash
-cd server
-# 首次需要设置环境变量（PowerShell 示例；bash 用 export）
+```powershell
+# PowerShell 示例
 $env:AUTH_SECRET="dev-secret-change-me"
 $env:DATABASE_PATH="./data/app.db"
+$env:UPLOAD_DIR="./data/uploads"
 $env:SEED_ON_START="1"
-go run ./cmd/server
+pwsh -File scripts/dev-server.ps1
 ```
 
 健康检查：`http://localhost:3100/api/health`。
@@ -106,11 +113,11 @@ npm run dev
 
 ```bash
 cd web && npm ci && npm run build
+# 复制 web/dist 到 server/webdist 后再编译（go:embed 需要）
 cd ../server && go build -o ../aiworkspace ./cmd/server
-# 把 web/dist 放进 server/webdist 再编译（go:embed 需要）
 ```
 
-> 也可以直接 `docker compose up -d --build`，Dockerfile 会自动完成前后端构建与内嵌。
+> 直接 `docker compose up -d --build` 会自动完成前后端构建与内嵌。
 
 ---
 
@@ -124,7 +131,7 @@ docker compose logs -f web
 ```
 
 - 端口映射 `3100:3100`（容器内 Go 服务监听 3100）。
-- 数据持久化：命名卷 `aiworkspace-data` → `/data/app.db`；`down` 不丢数据，`down -v` 重置。
+- 数据持久化：命名卷 `aiworkspace-data` → `/data`（`app.db` + `uploads/`）；`down` 不丢数据，`down -v` 重置。
 - 空库首次启动自动写演示数据；`SEED_ON_START=0` 关闭。
 - 健康检查：容器内 `wget http://127.0.0.1:3100/api/health`。
 
@@ -147,7 +154,9 @@ docker compose logs -f web
 | `AUTH_SECRET` | 无（生产必须配置） | 会话 Cookie 签名密钥 |
 | `PORT` | `3100` | 监听端口 |
 | `DATABASE_PATH` | `./data/app.db`（本地）/ `/data/app.db`（容器） | SQLite 文件路径 |
+| `UPLOAD_DIR` | `./data/uploads`（本地）/ `/data/uploads`（容器） | 提交附件目录 |
 | `SEED_ON_START` | `1` | 空库时是否写演示数据 |
+| `APP_ENV` | 空 | `production` 时强制 Secure Cookie、要求 AUTH_SECRET |
 
 ---
 
@@ -162,18 +171,18 @@ docker compose logs -f web
 
 ## 7. 后续可迭代
 
-- 学生作业附件上传（图片/PDF）
+- 提交附件在线预览（图片 / PDF）
+- 阶段性评价、评价模板与评价维度复用
+- 开放课题（学生可自主加入）
 - 通知与提醒（站内信 / 邮件）
-- 多学校与管理员后台
-- 成绩统计图表、导出 Excel/PDF
-- 迁移 PostgreSQL
-- 自动化测试（Playwright E2E / Go httptest）与 CI
+- 管理员后台、多学校、导出与统计
+- 自动化测试（Go httptest / Playwright E2E）与 CI
 
 ---
 
 ## 8. 文档
 
 - [`docs/requirements.md`](docs/requirements.md) —— 需求与验收标准
-- [`docs/architecture.md`](docs/architecture.md) —— 架构与请求流程（v1 架构说明，Go 版见 CONTRACT）
+- [`docs/architecture.md`](docs/architecture.md) —— 架构与请求流程
 - [`docs/design-system.md`](docs/design-system.md) —— 设计系统
-- [`docs/CONTRACT.md`](docs/CONTRACT.md) —— API/数据模型/前端约定
+- [`docs/CONTRACT.md`](docs/CONTRACT.md) —— API/数据模型/权限/前端约定

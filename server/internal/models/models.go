@@ -1,93 +1,56 @@
-// Package models 定义与 docs/CONTRACT.md 第 5 节 JSON 契约一一对应的结构体。
+// Package models 定义与 docs/CONTRACT.md v3 第 4–6 节 JSON 契约一一对应的结构体。
 //
 // 约定：
 //   - 所有 JSON 字段使用 camelCase；
 //   - 时间一律为 RFC3339（UTC）字符串，可空时间用 *string（JSON null）；
-//   - 可空的分数 / 评语用指针，保证 null 与 0 / "" 可区分；
-//   - 所有列表字段在构造时初始化，避免序列化成 null，方便前端直接 map。
+//   - 所有列表字段在构造时初始化为空切片，避免序列化成 null，方便前端直接 map。
 package models
 
-// User 当前登录用户（/api/auth/login、/api/me）。
+/* ------------------------------------------------------------------ */
+/* 通用                                                                */
+/* ------------------------------------------------------------------ */
+
+// User 用户 JSON（登录 / /api/me / 教师学生列表）：绝不包含密码哈希。
 type User struct {
 	ID          string `json:"id"`
+	LoginID     string `json:"loginId"`
 	Name        string `json:"name"`
-	Email       string `json:"email"`
 	Role        string `json:"role"`
 	AvatarColor string `json:"avatarColor"`
+	HasPassword bool   `json:"hasPassword"`
 }
 
-// StudentBrief 教师工作台「最近提交」里的学生信息（不含邮箱）。
-type StudentBrief struct {
+// ManagedStudent 教师学生管理列表项（含创建时间，绝不包含密码哈希）。
+type ManagedStudent struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
+	LoginID     string `json:"loginId"`
+	Role        string `json:"role"`
 	AvatarColor string `json:"avatarColor"`
+	HasPassword bool   `json:"hasPassword"`
+	CreatedAt   string `json:"createdAt"`
 }
 
-// StudentContact 班级成员 / 作业提交人 / 未提交名单里的学生信息。
-type StudentContact struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Email       string `json:"email"`
-	AvatarColor string `json:"avatarColor"`
-}
-
-// ClassStudent 班级详情的成员，附带加入时间。
-type ClassStudent struct {
-	StudentContact
-	CreatedAt string `json:"createdAt"`
-}
-
-// TeacherBrief 班级里的教师信息。
-type TeacherBrief struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
-}
-
-// TeacherName 学生作业详情里的教师姓名。
-type TeacherName struct {
-	Name string `json:"name"`
-}
-
-// ClassName 班级名称。
-type ClassName struct {
-	Name string `json:"name"`
-}
-
-// ClassIDName 班级 id + 名称。
-type ClassIDName struct {
+// IDName 只含 id + name 的简要对象。
+type IDName struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
-// ClassWithTeacher 学生作业详情里的班级（含教师姓名）。
-type ClassWithTeacher struct {
-	ID      string      `json:"id"`
-	Name    string      `json:"name"`
-	Teacher TeacherName `json:"teacher"`
+// NameOnly 只含姓名的简要对象（学生端课题创建者 / 助教）。
+type NameOnly struct {
+	Name string `json:"name"`
 }
 
-// CourseTitleClass 课程标题 + 班级名称（工作台、学生成绩用）。
-type CourseTitleClass struct {
-	Title string    `json:"title"`
-	Class ClassName `json:"class"`
+// OK 通用 {"ok":true} 响应。
+type OK struct {
+	OK bool `json:"ok"`
 }
 
-// CourseTitleClassID 课程标题 + 班级 id/名称（学生作业列表用）。
-type CourseTitleClassID struct {
-	Title string      `json:"title"`
-	Class ClassIDName `json:"class"`
+// CreatedID 创建资源时的 201 响应 {"id":...}。
+type CreatedID struct {
+	ID string `json:"id"`
 }
-
-// CourseBrief 班级列表里的课程概要。
-type CourseBrief struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
-	Color string `json:"color"`
-}
-
-/* ------------------------------------------------------------------ */
-/* 健康检查                                                            */
-/* ------------------------------------------------------------------ */
 
 // Health GET /api/health 响应。
 type Health struct {
@@ -96,174 +59,170 @@ type Health struct {
 	Time    string `json:"time"`
 }
 
-// OK 通用 { "ok": true } 响应。
-type OK struct {
-	OK bool `json:"ok"`
-}
-
 /* ------------------------------------------------------------------ */
 /* 教师端                                                              */
 /* ------------------------------------------------------------------ */
 
 // TeacherOverview GET /api/teacher/overview 响应。
 type TeacherOverview struct {
-	ClassCount          int                  `json:"classCount"`
-	CourseCount         int                  `json:"courseCount"`
-	StudentCount        int                  `json:"studentCount"`
-	PendingGrading      int                  `json:"pendingGrading"`
-	RecentSubmissions   []RecentSubmission   `json:"recentSubmissions"`
-	UpcomingAssignments []UpcomingAssignment `json:"upcomingAssignments"`
+	TopicCount             int                `json:"topicCount"`
+	StudentCount           int                `json:"studentCount"`
+	PendingEvaluationCount int                `json:"pendingEvaluationCount"`
+	RecentEvaluations      []RecentEvaluation `json:"recentEvaluations"`
+	Topics                 []OverviewTopic    `json:"topics"`
 }
 
-// RecentSubmission 最近一条提交。
-type RecentSubmission struct {
-	ID          string            `json:"id"`
-	SubmittedAt string            `json:"submittedAt"`
-	Score       *int              `json:"score"`
-	Student     StudentBrief      `json:"student"`
-	Assignment  AssignmentSummary `json:"assignment"`
-}
-
-// AssignmentSummary 最近提交所属作业的概要。
-type AssignmentSummary struct {
-	ID     string           `json:"id"`
-	Title  string           `json:"title"`
-	Points int              `json:"points"`
-	Course CourseTitleClass `json:"course"`
-}
-
-// UpcomingAssignment 即将截止的作业。
-type UpcomingAssignment struct {
-	ID             string           `json:"id"`
-	Title          string           `json:"title"`
-	DueAt          *string          `json:"dueAt"`
-	Points         int              `json:"points"`
-	Course         CourseTitleClass `json:"course"`
-	SubmittedCount int              `json:"submittedCount"`
-}
-
-// TeacherClass 教师班级列表项（也用于创建班级的响应）。
-type TeacherClass struct {
-	ID              string        `json:"id"`
-	Name            string        `json:"name"`
-	Grade           *string       `json:"grade"`
-	JoinCode        string        `json:"joinCode"`
-	CreatedAt       string        `json:"createdAt"`
-	EnrollmentCount int           `json:"enrollmentCount"`
-	CourseCount     int           `json:"courseCount"`
-	Courses         []CourseBrief `json:"courses"`
-}
-
-// TeacherClassDetail GET /api/teacher/classes/{id} 响应。
-type TeacherClassDetail struct {
-	ID            string         `json:"id"`
-	Name          string         `json:"name"`
-	Grade         *string        `json:"grade"`
-	JoinCode      string         `json:"joinCode"`
-	Teacher       TeacherBrief   `json:"teacher"`
-	Students      []ClassStudent `json:"students"`
-	Courses       []ClassCourse  `json:"courses"`
-	Announcements []Announcement `json:"announcements"`
-}
-
-// ClassCourse 班级详情里的课程。
-type ClassCourse struct {
-	ID                string            `json:"id"`
-	Title             string            `json:"title"`
-	Description       *string           `json:"description"`
-	Color             string            `json:"color"`
-	AssignmentCount   int               `json:"assignmentCount"`
-	RecentAssignments []AssignmentBrief `json:"recentAssignments"`
-}
-
-// AssignmentBrief 课程下最近的作业（id / 标题 / 截止时间）。
-type AssignmentBrief struct {
-	ID    string  `json:"id"`
-	Title string  `json:"title"`
-	DueAt *string `json:"dueAt"`
-}
-
-// Announcement 班级公告。
-type Announcement struct {
+// RecentEvaluation 工作台「最近评价」。
+type RecentEvaluation struct {
 	ID        string `json:"id"`
-	Title     string `json:"title"`
-	Content   string `json:"content"`
 	CreatedAt string `json:"createdAt"`
+	Comment   string `json:"comment"`
+	Student   IDName `json:"student"`
+	Topic     IDName `json:"topic"`
 }
 
-// CreatedCourse POST /api/teacher/classes/{id}/courses 的 201 响应。
-type CreatedCourse struct {
+// OverviewTopic 工作台「我的课题」概要。
+type OverviewTopic struct {
+	ID              string `json:"id"`
+	Title           string `json:"title"`
+	Status          string `json:"status"`
+	MemberCount     int    `json:"memberCount"`
+	SubmissionCount int    `json:"submissionCount"`
+	PendingCount    int    `json:"pendingCount"`
+}
+
+// TeacherTopic GET /api/teacher/topics 列表项。
+type TeacherTopic struct {
+	ID              string `json:"id"`
+	Title           string `json:"title"`
+	Status          string `json:"status"`
+	JoinMode        string `json:"joinMode"`
+	Owner           IDName `json:"owner"`
+	IsOwner         bool   `json:"isOwner"`
+	MemberCount     int    `json:"memberCount"`
+	SubmissionCount int    `json:"submissionCount"`
+	PendingCount    int    `json:"pendingCount"`
+	UpdatedAt       string `json:"updatedAt"`
+}
+
+// TeacherTopicDetail GET /api/teacher/topics/{id} 响应。
+type TeacherTopicDetail struct {
+	ID            string                   `json:"id"`
+	Title         string                   `json:"title"`
+	DescriptionMD string                   `json:"descriptionMd"`
+	Status        string                   `json:"status"`
+	JoinMode      string                   `json:"joinMode"`
+	Owner         IDName                   `json:"owner"`
+	Assistants    []TopicAssistant         `json:"assistants"`
+	Students      []TopicStudent           `json:"students"`
+	Dimensions    []Dimension              `json:"dimensions"`
+	Submissions   []TeacherTopicSubmission `json:"submissions"`
+}
+
+// TopicAssistant 课题助教。
+type TopicAssistant struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	LoginID string `json:"loginId"`
+}
+
+// TopicStudent 课题成员（removedAt 非空表示已移出但保留历史）。
+type TopicStudent struct {
 	ID          string  `json:"id"`
-	Title       string  `json:"title"`
-	Description *string `json:"description"`
-	Color       string  `json:"color"`
-	ClassID     string  `json:"classId"`
-	CreatedAt   string  `json:"createdAt"`
+	Name        string  `json:"name"`
+	LoginID     string  `json:"loginId"`
+	HasPassword bool    `json:"hasPassword"`
+	RemovedAt   *string `json:"removedAt"`
 }
 
-// CreatedAnnouncement POST /api/teacher/classes/{id}/announcements 的 201 响应。
-type CreatedAnnouncement struct {
+// Dimension 评价维度。
+type Dimension struct {
 	ID        string `json:"id"`
-	Title     string `json:"title"`
-	Content   string `json:"content"`
-	ClassID   string `json:"classId"`
-	CreatedAt string `json:"createdAt"`
+	Name      string `json:"name"`
+	MaxScore  int    `json:"maxScore"`
+	SortOrder int    `json:"sortOrder"`
 }
 
-// CreatedAssignment POST /api/teacher/assignments 的 201 响应。
-type CreatedAssignment struct {
-	ID string `json:"id"`
+// StudentBrief 提交里的学生信息。
+type StudentBrief struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	LoginID string `json:"loginId"`
 }
 
-// TeacherAssignment 教师作业列表项。
-type TeacherAssignment struct {
-	ID             string                  `json:"id"`
-	Title          string                  `json:"title"`
-	Points         int                     `json:"points"`
-	DueAt          *string                 `json:"dueAt"`
-	CreatedAt      string                  `json:"createdAt"`
-	Course         TeacherAssignmentCourse `json:"course"`
-	SubmittedCount int                     `json:"submittedCount"`
-	GradedCount    int                     `json:"gradedCount"`
+// TeacherTopicSubmission 课题详情里的提交列表项。
+type TeacherTopicSubmission struct {
+	ID               string             `json:"id"`
+	Student          StudentBrief       `json:"student"`
+	TextContent      string             `json:"textContent"`
+	UpdatedAt        string             `json:"updatedAt"`
+	FileCount        int                `json:"fileCount"`
+	EvaluationCount  int                `json:"evaluationCount"`
+	LatestEvaluation *EvaluationSummary `json:"latestEvaluation"`
+	Pending          bool               `json:"pending"`
 }
 
-// TeacherAssignmentCourse 作业列表里的课程 / 班级。
-type TeacherAssignmentCourse struct {
-	ID    string      `json:"id"`
-	Title string      `json:"title"`
-	Class ClassIDName `json:"class"`
+// EvaluationSummary 提交列表里的最近一次评价。
+type EvaluationSummary struct {
+	ID      string        `json:"id"`
+	Comment string        `json:"comment"`
+	Scores  []ScoreDetail `json:"scores"`
 }
 
-// TeacherAssignmentDetail GET /api/teacher/assignments/{id} 响应。
-type TeacherAssignmentDetail struct {
-	ID              string                 `json:"id"`
-	Title           string                 `json:"title"`
-	Description     *string                `json:"description"`
-	Points          int                    `json:"points"`
-	DueAt           *string                `json:"dueAt"`
-	CreatedAt       string                 `json:"createdAt"`
-	Course          AssignmentDetailCourse `json:"course"`
-	SubmissionCount int                    `json:"submissionCount"`
-	GradedCount     int                    `json:"gradedCount"`
-	Submissions     []GradeSubmission      `json:"submissions"`
-	MissingStudents []StudentContact       `json:"missingStudents"`
+// ScoreDetail 带维度 id / 名称 / 满分的分数（教师侧）。
+type ScoreDetail struct {
+	DimensionID   string `json:"dimensionId"`
+	DimensionName string `json:"dimensionName"`
+	Score         int    `json:"score"`
+	MaxScore      int    `json:"maxScore"`
 }
 
-// AssignmentDetailCourse 作业详情里的课程 / 班级。
-type AssignmentDetailCourse struct {
-	Title string      `json:"title"`
-	Class ClassIDName `json:"class"`
+// TeacherSubmissionDetail GET /api/teacher/submissions/{id} 响应。
+type TeacherSubmissionDetail struct {
+	ID          string              `json:"id"`
+	Topic       IDName              `json:"topic"`
+	Student     StudentBrief        `json:"student"`
+	TextContent string              `json:"textContent"`
+	Files       []SubmissionFile    `json:"files"`
+	UpdatedAt   string              `json:"updatedAt"`
+	Evaluations []TeacherEvaluation `json:"evaluations"`
 }
 
-// GradeSubmission 作业详情里的一条提交（含批改信息）。
-type GradeSubmission struct {
-	ID          string         `json:"id"`
-	Student     StudentContact `json:"student"`
-	Content     string         `json:"content"`
-	SubmittedAt string         `json:"submittedAt"`
-	Score       *int           `json:"score"`
-	Feedback    *string        `json:"feedback"`
-	GradedAt    *string        `json:"gradedAt"`
+// SubmissionFile 提交附件（教师侧，含 MIME）。
+type SubmissionFile struct {
+	ID           string `json:"id"`
+	OriginalName string `json:"originalName"`
+	MimeType     string `json:"mimeType"`
+	SizeBytes    int64  `json:"sizeBytes"`
+}
+
+// TeacherEvaluation 提交详情里的一次评价。
+type TeacherEvaluation struct {
+	ID        string        `json:"id"`
+	CreatedAt string        `json:"createdAt"`
+	Teacher   IDName        `json:"teacher"`
+	Comment   string        `json:"comment"`
+	Scores    []ScoreDetail `json:"scores"`
+}
+
+// EvaluationListItem GET /api/teacher/evaluations 列表项。
+type EvaluationListItem struct {
+	ID           string       `json:"id"`
+	CreatedAt    string       `json:"createdAt"`
+	Comment      string       `json:"comment"`
+	Teacher      IDName       `json:"teacher"`
+	Student      IDName       `json:"student"`
+	Topic        IDName       `json:"topic"`
+	SubmissionID string       `json:"submissionId"`
+	Scores       []ScoreBrief `json:"scores"`
+}
+
+// ScoreBrief 只含维度 id / 名称 / 分数 / 满分的分数（汇总页与学生侧）。
+type ScoreBrief struct {
+	DimensionID   string `json:"dimensionId"`
+	DimensionName string `json:"dimensionName"`
+	Score         int    `json:"score"`
+	MaxScore      int    `json:"maxScore"`
 }
 
 /* ------------------------------------------------------------------ */
@@ -272,106 +231,78 @@ type GradeSubmission struct {
 
 // StudentOverview GET /api/student/overview 响应。
 type StudentOverview struct {
-	ClassCount          int                     `json:"classCount"`
-	CourseCount         int                     `json:"courseCount"`
-	PendingCount        int                     `json:"pendingCount"`
-	SubmittedCount      int                     `json:"submittedCount"`
-	AveragePercent      *int                    `json:"averagePercent"` // 无已批改作业时为 null
-	DueSoon             []DueSoonAssignment     `json:"dueSoon"`
-	RecentAnnouncements []AnnouncementWithClass `json:"recentAnnouncements"`
+	TopicCount             int                     `json:"topicCount"`
+	PendingSubmissionCount int                     `json:"pendingSubmissionCount"`
+	SubmittedCount         int                     `json:"submittedCount"`
+	LatestEvaluations      []StudentEvaluationItem `json:"latestEvaluations"`
+	Topics                 []StudentOverviewTopic  `json:"topics"`
 }
 
-// DueSoonAssignment 学生工作台「即将截止」。
-type DueSoonAssignment struct {
-	ID     string           `json:"id"`
-	Title  string           `json:"title"`
-	DueAt  *string          `json:"dueAt"`
-	Points int              `json:"points"`
-	Course CourseTitleClass `json:"course"`
+// StudentOverviewTopic 学生工作台「我的课题」概要（与学生课题列表项一致）。
+type StudentOverviewTopic struct {
+	ID              string   `json:"id"`
+	Title           string   `json:"title"`
+	Status          string   `json:"status"`
+	Owner           NameOnly `json:"owner"`
+	EvaluationCount int      `json:"evaluationCount"`
+	Submitted       bool     `json:"submitted"`
+	UpdatedAt       string   `json:"updatedAt"`
+	RemovedAt       *string  `json:"removedAt"`
 }
 
-// AnnouncementWithClass 学生端公告（带班级名称）。
-type AnnouncementWithClass struct {
-	ID        string    `json:"id"`
-	Title     string    `json:"title"`
-	Content   string    `json:"content"`
-	CreatedAt string    `json:"createdAt"`
-	Class     ClassName `json:"class"`
+// StudentEvaluationItem 学生评价（工作台最近评价 / 我的全部评价）。
+type StudentEvaluationItem struct {
+	ID        string       `json:"id"`
+	CreatedAt string       `json:"createdAt"`
+	Comment   string       `json:"comment"`
+	Topic     IDName       `json:"topic"`
+	Scores    []ScoreBrief `json:"scores"`
 }
 
-// StudentClass 学生班级列表项。
-type StudentClass struct {
-	ID           string          `json:"id"`
-	Name         string          `json:"name"`
-	Teacher      TeacherBrief    `json:"teacher"`
-	StudentCount int             `json:"studentCount"`
-	Courses      []StudentCourse `json:"courses"`
+// StudentTopic GET /api/student/topics 列表项（含历史课题）。
+type StudentTopic struct {
+	ID        string   `json:"id"`
+	Title     string   `json:"title"`
+	Status    string   `json:"status"`
+	Owner     NameOnly `json:"owner"`
+	Submitted bool     `json:"submitted"`
+	UpdatedAt string   `json:"updatedAt"`
+	RemovedAt *string  `json:"removedAt"`
 }
 
-// StudentCourse 学生班级里的课程（含作业数）。
-type StudentCourse struct {
-	ID              string `json:"id"`
-	Title           string `json:"title"`
-	AssignmentCount int    `json:"assignmentCount"`
+// StudentTopicDetail GET /api/student/topics/{id} 响应。
+type StudentTopicDetail struct {
+	ID            string                   `json:"id"`
+	Title         string                   `json:"title"`
+	DescriptionMD string                   `json:"descriptionMd"`
+	Status        string                   `json:"status"`
+	Owner         NameOnly                 `json:"owner"`
+	Assistants    []NameOnly               `json:"assistants"`
+	MySubmission  *StudentSubmission       `json:"mySubmission"`
+	MyEvaluations []StudentEvaluationBrief `json:"myEvaluations"`
 }
 
-// JoinResult POST /api/student/classes/join 的响应。
-type JoinResult struct {
-	OK        bool   `json:"ok"`
-	ClassName string `json:"className"`
+// StudentSubmission 学生自己的提交。
+type StudentSubmission struct {
+	ID          string        `json:"id"`
+	TextContent string        `json:"textContent"`
+	UpdatedAt   string        `json:"updatedAt"`
+	Files       []StudentFile `json:"files"`
 }
 
-// StudentAssignment 学生作业列表项。
-type StudentAssignment struct {
-	ID           string             `json:"id"`
-	Title        string             `json:"title"`
-	Points       int                `json:"points"`
-	DueAt        *string            `json:"dueAt"`
-	Course       CourseTitleClassID `json:"course"`
-	MySubmission *MySubmission      `json:"mySubmission"`
+// StudentFile 学生自己的附件（下载走 /api/student/files/{fileId}）。
+type StudentFile struct {
+	ID           string `json:"id"`
+	OriginalName string `json:"originalName"`
+	MimeType     string `json:"mimeType"`
+	SizeBytes    int64  `json:"sizeBytes"`
 }
 
-// MySubmission 学生自己的提交摘要。
-type MySubmission struct {
-	ID          string  `json:"id"`
-	SubmittedAt string  `json:"submittedAt"`
-	Content     string  `json:"content"`
-	Score       *int    `json:"score"`
-	Feedback    *string `json:"feedback"`
-	GradedAt    *string `json:"gradedAt"`
-}
-
-// StudentAssignmentDetail GET /api/student/assignments/{id} 响应。
-type StudentAssignmentDetail struct {
-	ID           string              `json:"id"`
-	Title        string              `json:"title"`
-	Description  *string             `json:"description"`
-	Points       int                 `json:"points"`
-	DueAt        *string             `json:"dueAt"`
-	Course       StudentCourseDetail `json:"course"`
-	MySubmission *MySubmission       `json:"mySubmission"`
-}
-
-// StudentCourseDetail 学生作业详情里的课程 / 班级。
-type StudentCourseDetail struct {
-	Title string           `json:"title"`
-	Class ClassWithTeacher `json:"class"`
-}
-
-// Grade 学生成绩单条目（仅已批改的提交）。
-type Grade struct {
-	ID          string          `json:"id"`
-	Score       int             `json:"score"`
-	Feedback    *string         `json:"feedback"`
-	SubmittedAt string          `json:"submittedAt"`
-	Assignment  GradeAssignment `json:"assignment"`
-}
-
-// GradeAssignment 成绩单里的作业信息。
-type GradeAssignment struct {
-	ID     string           `json:"id"`
-	Title  string           `json:"title"`
-	Points int              `json:"points"`
-	DueAt  *string          `json:"dueAt"`
-	Course CourseTitleClass `json:"course"`
+// StudentEvaluationBrief 学生课题详情里的评价（含评价教师）。
+type StudentEvaluationBrief struct {
+	ID        string       `json:"id"`
+	CreatedAt string       `json:"createdAt"`
+	Teacher   IDName       `json:"teacher"`
+	Comment   string       `json:"comment"`
+	Scores    []ScoreBrief `json:"scores"`
 }

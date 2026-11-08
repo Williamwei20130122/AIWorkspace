@@ -1,13 +1,13 @@
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { LoginForm } from "@/components/auth/LoginForm";
-import { IconBook, IconClipboard, IconGraduation, IconUsers } from "@/components/ui/icons";
+import { IconAward, IconBook, IconClipboard, IconGraduation } from "@/components/ui/icons";
 import { roleHome } from "@/lib/format";
 
 const HIGHLIGHTS = [
-  { icon: <IconUsers className="size-5" />, title: "班级与成员", desc: "邀请码入班，名单一目了然" },
-  { icon: <IconBook className="size-5" />, title: "课程组织", desc: "按班级建课，课程内发布作业" },
-  { icon: <IconClipboard className="size-5" />, title: "作业闭环", desc: "发布、提交、批改、反馈一处完成" },
+  { icon: <IconBook className="size-5" />, title: "课题介绍", desc: "老师建课题，学生被动加入" },
+  { icon: <IconClipboard className="size-5" />, title: "提交作品", desc: "文本与任意文件，随时重新提交" },
+  { icon: <IconAward className="size-5" />, title: "多维评价", desc: "自定义评分维度 + 文字评语" },
 ];
 
 export default function LoginPage() {
@@ -30,15 +30,15 @@ export default function LoginPage() {
 
         <div className="max-w-md">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">
-            Teaching Workspace
+            Topic · Submission · Evaluation
           </p>
           <h1 className="mt-3 text-4xl font-bold leading-tight tracking-tight">
-            让教师专注教学，
+            从课题开始，
             <br />
-            让学生看见成长。
+            让每一次提交都被看见。
           </h1>
           <p className="mt-4 text-sm leading-6 text-white/80">
-            一个轻量的网页教学空间：班级、课程、作业、提交与成绩，全部收在一个工作台里。
+            老师创建课题、管理学生与助教；学生用学号进入，提交作品；多维度评价沉淀成长记录。
           </p>
 
           <ul className="mt-8 space-y-4">
@@ -75,14 +75,20 @@ export default function LoginPage() {
           </div>
 
           <h2 className="text-2xl font-semibold tracking-tight text-brand-900">登录</h2>
-          <p className="mt-1.5 text-sm text-ink-soft">使用学校发放的教师或学生账号登录</p>
+          <p className="mt-1.5 text-sm text-ink-soft">使用老师分配的学号（或教师工号）登录</p>
 
           <div className="mt-6">
             <LoginForm />
           </div>
 
           <p className="mt-8 text-xs leading-relaxed text-ink-soft">
-            遇到问题请联系班主任或教务处。首次使用请先让教师创建班级，学生凭 6 位邀请码加入。
+            学生账号由老师创建，默认没有密码，可直接用学号进入；也可以登录后自行设置密码。
+          </p>
+          <p className="mt-3 text-xs text-ink-soft">
+            还没有教师账号？
+            <Link to="/register" className="ml-1 font-medium text-brand-700 hover:underline">
+              教师注册
+            </Link>
           </p>
         </div>
       </div>

@@ -45,6 +45,7 @@ COPY --from=go-build /out/aiworkspace ./aiworkspace
 
 ENV PORT=3100
 ENV DATABASE_PATH=/data/app.db
+ENV UPLOAD_DIR=/data/uploads
 
 EXPOSE 3100
 USER app

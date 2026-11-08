@@ -1,188 +1,172 @@
-/** 与后端 JSON 契约（docs/CONTRACT.md 第 5 节）一一对应的类型 */
+/** 与后端 v3 JSON 契约（docs/CONTRACT.md 第 6 节）一一对应的类型 */
 
 export type Role = "TEACHER" | "STUDENT" | "ADMIN";
+export type TopicStatus = "ACTIVE" | "CLOSED";
 
 export interface User {
   id: string;
+  loginId: string;
   name: string;
-  email: string;
   role: Role;
   avatarColor: string;
+  hasPassword: boolean;
 }
 
-export interface StudentBrief {
+export interface ManagedStudent {
   id: string;
   name: string;
-  email: string;
-  avatarColor: string;
-  createdAt?: string;
+  loginId: string;
+  hasPassword: boolean;
+  createdAt: string;
 }
 
-export interface ClassSummary {
+export interface TopicSummary {
+  id: string;
+  title: string;
+  status: TopicStatus;
+  joinMode: string;
+  owner: { id: string; name: string };
+  isOwner: boolean;
+  memberCount: number;
+  submissionCount: number;
+  pendingCount: number;
+  updatedAt: string;
+}
+
+export interface TopicStudent {
   id: string;
   name: string;
-  grade: string | null;
-  joinCode: string;
-  createdAt: string;
-  enrollmentCount: number;
-  courseCount: number;
-  courses: { id: string; title: string; color: string }[];
+  loginId: string;
+  hasPassword: boolean;
+  removedAt: string | null;
 }
 
-export interface CourseBrief {
-  id: string;
-  title: string;
-  description: string | null;
-  color: string;
-  assignmentCount: number;
-  recentAssignments: { id: string; title: string; dueAt: string | null }[];
-}
-
-export interface Announcement {
-  id: string;
-  title: string;
-  content: string;
-  createdAt: string;
-  className?: string;
-}
-
-export interface TeacherClassDetail {
+export interface TopicAssistant {
   id: string;
   name: string;
-  grade: string | null;
-  joinCode: string;
-  teacher: { name: string; email: string };
-  students: StudentBrief[];
-  courses: CourseBrief[];
-  announcements: Announcement[];
+  loginId: string;
 }
 
-export interface RecentSubmission {
+export interface Dimension {
   id: string;
-  submittedAt: string;
-  score: number | null;
-  student: { id: string; name: string; avatarColor: string };
-  assignment: {
-    id: string;
-    title: string;
-    points: number;
-    course: { title: string; class: { name: string } };
-  };
+  name: string;
+  maxScore: number;
+  sortOrder: number;
 }
 
-export interface UpcomingAssignment {
+export interface EvaluationScore {
+  dimensionId: string;
+  dimensionName: string;
+  score: number;
+  maxScore: number;
+}
+
+export interface Evaluation {
   id: string;
-  title: string;
-  dueAt: string | null;
-  points: number;
-  course: { title: string; class: { name: string } };
-  submittedCount: number;
-}
-
-export interface TeacherOverview {
-  classCount: number;
-  courseCount: number;
-  studentCount: number;
-  pendingGrading: number;
-  recentSubmissions: RecentSubmission[];
-  upcomingAssignments: UpcomingAssignment[];
-}
-
-export interface TeacherAssignmentListItem {
-  id: string;
-  title: string;
-  points: number;
-  dueAt: string | null;
   createdAt: string;
-  course: { id: string; title: string; class: { id: string; name: string } };
-  submittedCount: number;
-  gradedCount: number;
+  teacher: { id: string; name: string };
+  comment: string;
+  scores: EvaluationScore[];
+}
+
+export interface SubmissionFile {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
+export interface SubmissionSummary {
+  id: string;
+  student: { id: string; name: string; loginId: string };
+  textContent: string;
+  updatedAt: string;
+  fileCount: number;
+  evaluationCount: number;
+  latestEvaluation: Evaluation | null;
+  pending: boolean;
+}
+
+export interface TopicDetail {
+  id: string;
+  title: string;
+  descriptionMd: string;
+  status: TopicStatus;
+  joinMode: string;
+  owner: { id: string; name: string };
+  assistants: TopicAssistant[];
+  students: TopicStudent[];
+  dimensions: Dimension[];
+  submissions: SubmissionSummary[];
 }
 
 export interface SubmissionDetail {
   id: string;
-  student: { id: string; name: string; email: string; avatarColor: string };
-  content: string;
-  submittedAt: string;
-  score: number | null;
-  feedback: string | null;
-  gradedAt: string | null;
+  topic: { id: string; title: string };
+  student: { id: string; name: string; loginId: string; avatarColor?: string };
+  textContent: string;
+  files: SubmissionFile[];
+  updatedAt: string;
+  evaluations: Evaluation[];
 }
 
-export interface TeacherAssignmentDetail {
+export interface TeacherOverview {
+  topicCount: number;
+  studentCount: number;
+  pendingEvaluationCount: number;
+  recentEvaluations: EvaluationListItem[];
+  topics: TopicSummary[];
+}
+
+export interface EvaluationListItem {
+  id: string;
+  createdAt: string;
+  comment: string;
+  teacher: { id: string; name: string };
+  student: { id: string; name: string };
+  topic: { id: string; title: string };
+  submissionId: string;
+  scores: EvaluationScore[];
+}
+
+export interface StudentTopicSummary {
   id: string;
   title: string;
-  description: string | null;
-  points: number;
-  dueAt: string | null;
-  createdAt: string;
-  course: { title: string; class: { id: string; name: string } };
-  submissionCount: number;
-  gradedCount: number;
-  submissions: SubmissionDetail[];
-  missingStudents: StudentBrief[];
+  status: TopicStatus;
+  owner: { name: string };
+  submitted: boolean;
+  updatedAt: string;
+  removedAt: string | null;
 }
 
 export interface StudentOverview {
-  classCount: number;
-  courseCount: number;
-  pendingCount: number;
+  topicCount: number;
+  pendingSubmissionCount: number;
   submittedCount: number;
-  averagePercent: number | null;
-  dueSoon: {
-    id: string;
-    title: string;
-    dueAt: string | null;
-    points: number;
-    course: { title: string; class: { name: string } };
-  }[];
-  recentAnnouncements: Announcement[];
+  latestEvaluations: MyEvaluationItem[];
+  topics: StudentTopicSummary[];
 }
 
-export interface StudentClass {
+export interface MyEvaluationItem {
   id: string;
-  name: string;
-  teacher: { name: string; email: string };
-  studentCount: number;
-  courses: { id: string; title: string; assignmentCount: number }[];
+  createdAt: string;
+  comment: string;
+  topic: { id: string; title: string };
+  scores: EvaluationScore[];
 }
 
-export interface MySubmission {
-  id: string;
-  submittedAt: string;
-  score: number | null;
-  feedback: string | null;
-}
-
-export interface StudentAssignmentListItem {
+export interface StudentTopicDetail {
   id: string;
   title: string;
-  points: number;
-  dueAt: string | null;
-  course: { title: string; class: { id: string; name: string } };
-  mySubmission: MySubmission | null;
-}
-
-export interface StudentAssignmentDetail {
-  id: string;
-  title: string;
-  description: string | null;
-  points: number;
-  dueAt: string | null;
-  course: { title: string; class: { id: string; name: string; teacher: { name: string } } };
-  mySubmission: MySubmission | null;
-}
-
-export interface GradeItem {
-  id: string;
-  score: number;
-  feedback: string | null;
-  submittedAt: string;
-  assignment: {
+  descriptionMd: string;
+  status: TopicStatus;
+  owner: { name: string };
+  assistants: { name: string }[];
+  mySubmission: {
     id: string;
-    title: string;
-    points: number;
-    dueAt: string | null;
-    course: { title: string; class: { name: string } };
-  };
+    textContent: string;
+    updatedAt: string;
+    files: SubmissionFile[];
+  } | null;
+  myEvaluations: Evaluation[];
 }

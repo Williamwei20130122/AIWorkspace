@@ -174,13 +174,17 @@ func (a *Authenticator) CurrentUser(r *http.Request) (*models.User, bool) {
 	if !ok {
 		return nil, false
 	}
-	var user models.User
+	var (
+		user         models.User
+		passwordHash sql.NullString
+	)
 	err = a.db.QueryRowContext(r.Context(),
-		`SELECT id, name, email, role, avatar_color FROM users WHERE id = ?`, userID,
-	).Scan(&user.ID, &user.Name, &user.Email, &user.Role, &user.AvatarColor)
+		`SELECT id, login_id, name, role, avatar_color, password_hash FROM users WHERE id = ?`, userID,
+	).Scan(&user.ID, &user.LoginID, &user.Name, &user.Role, &user.AvatarColor, &passwordHash)
 	if err != nil {
 		return nil, false
 	}
+	user.HasPassword = passwordHash.Valid && passwordHash.String != ""
 	return &user, true
 }
 

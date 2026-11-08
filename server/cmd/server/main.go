@@ -7,6 +7,7 @@
 //
 //	PORT          监听端口（默认 3100）
 //	DATABASE_PATH SQLite 文件路径（默认 ./data/app.db）
+//	UPLOAD_DIR    附件存储目录（默认 ./data/uploads；Docker 为 /data/uploads）
 //	AUTH_SECRET   会话签名密钥；生产环境（APP_ENV=production）缺失时拒绝启动
 //	SEED_ON_START 首次启动且 users 为空时写入演示数据（默认开启；0/false 关闭）
 //	WEB_DIR       可选：用磁盘目录覆盖内嵌前端产物（默认用 go:embed 的 webdist）
@@ -41,9 +42,16 @@ func main() {
 
 	port := envOr("PORT", "3100")
 	databasePath := envOr("DATABASE_PATH", "./data/app.db")
+	uploadDir := envOr("UPLOAD_DIR", "./data/uploads")
 	seedOnStart := !isFalse(os.Getenv("SEED_ON_START"))
 	webDir := strings.TrimSpace(os.Getenv("WEB_DIR"))
 	secret, secureCookie := resolveAuthSecret()
+
+	// ---------- 上传目录 ----------
+	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
+		log.Fatalf("初始化上传目录失败：%v", err)
+	}
+	log.Printf("附件目录：%s", uploadDir)
 
 	// ---------- 数据库：打开 + 迁移 ----------
 	database, err := db.Open(databasePath)
@@ -55,12 +63,12 @@ func main() {
 
 	// ---------- 演示数据（仅 users 表为空时） ----------
 	if seedOnStart {
-		seeded, err := db.Seed(database)
+		seeded, err := db.Seed(database, uploadDir)
 		if err != nil {
 			log.Fatalf("写入演示数据失败：%v", err)
 		}
 		if seeded {
-			log.Printf("已写入演示数据：教师 teacher@demo.edu / 学生 student@demo.edu，密码 %s", db.DemoPassword)
+			log.Printf("已写入演示数据：教师 teacher@demo.edu 密码 %s；学生 S001（无密码）", db.DemoPassword)
 		} else {
 			log.Printf("用户表非空，跳过演示数据")
 		}
@@ -70,7 +78,7 @@ func main() {
 
 	// ---------- 路由 ----------
 	authenticator := auth.New(database, secret, secureCookie)
-	api := handlers.New(database, authenticator)
+	api := handlers.New(database, authenticator, uploadDir)
 	mux := http.NewServeMux()
 	api.Mount(mux)
 

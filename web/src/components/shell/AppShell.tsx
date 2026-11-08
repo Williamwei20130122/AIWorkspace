@@ -4,10 +4,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Avatar } from "@/components/ui/avatar";
 import {
-  IconBell,
+  IconAward,
   IconBook,
-  IconChart,
-  IconClipboard,
   IconClose,
   IconDashboard,
   IconGraduation,
@@ -30,15 +28,15 @@ function navForRole(role: string): NavItem[] {
   if (role === "TEACHER" || role === "ADMIN") {
     return [
       { href: "/teacher", label: "工作台", icon: <IconDashboard />, exact: true },
-      { href: "/teacher/classes", label: "我的班级", icon: <IconUsers /> },
-      { href: "/teacher/assignments", label: "作业与批改", icon: <IconClipboard /> },
+      { href: "/teacher/topics", label: "我的课题", icon: <IconBook /> },
+      { href: "/teacher/students", label: "学生管理", icon: <IconUsers /> },
+      { href: "/teacher/evaluations", label: "评价汇总", icon: <IconAward /> },
     ];
   }
   return [
     { href: "/student", label: "工作台", icon: <IconDashboard />, exact: true },
-    { href: "/student/classes", label: "我的班级", icon: <IconBook /> },
-    { href: "/student/assignments", label: "我的作业", icon: <IconClipboard /> },
-    { href: "/student/grades", label: "成绩单", icon: <IconChart /> },
+    { href: "/student/topics", label: "我的课题", icon: <IconBook /> },
+    { href: "/student/evaluations", label: "我的评价", icon: <IconAward /> },
   ];
 }
 
@@ -102,7 +100,9 @@ function UserCard({ user, onLogout }: { user: User; onLogout: () => void }) {
       <Avatar name={user.name} color={user.avatarColor} size="sm" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-brand-900">{user.name}</p>
-        <p className="truncate text-xs text-ink-soft">{ROLE_LABEL[user.role] ?? user.role}</p>
+        <p className="truncate text-xs text-ink-soft">
+          {ROLE_LABEL[user.role] ?? user.role} · {user.loginId}
+        </p>
       </div>
       <button
         type="button"
@@ -138,13 +138,6 @@ export function AppShell({ user, children }: { user: User; children: ReactNode }
           <NavList items={items} pathname={pathname} />
         </div>
         <div className="space-y-2">
-          <Link
-            to={user.role === "TEACHER" ? "/teacher/assignments" : "/student/assignments"}
-            className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-ink-soft transition-colors hover:bg-brand-50 hover:text-brand-700"
-          >
-            <IconBell className="size-4" />
-            查看待办与通知
-          </Link>
           <UserCard user={user} onLogout={handleLogout} />
         </div>
       </aside>

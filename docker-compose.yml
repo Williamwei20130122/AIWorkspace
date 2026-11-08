@@ -23,6 +23,7 @@ services:
     environment:
       PORT: "3100"
       DATABASE_PATH: /data/app.db
+      UPLOAD_DIR: /data/uploads
       # 生产环境务必替换：openssl rand -base64 48
       AUTH_SECRET: "${AUTH_SECRET:-aiworkspace-dev-secret-change-me}"
       # 首次启动（空库）自动写入演示数据；设为 0 可关闭

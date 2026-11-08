@@ -3,16 +3,16 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { roleHome } from "@/lib/format";
 import LoginPage from "@/pages/Login";
+import RegisterPage from "@/pages/Register";
 import TeacherDashboard from "@/pages/teacher/Dashboard";
-import TeacherClasses from "@/pages/teacher/Classes";
-import TeacherClassDetail from "@/pages/teacher/ClassDetail";
-import TeacherAssignments from "@/pages/teacher/Assignments";
-import TeacherAssignmentDetail from "@/pages/teacher/AssignmentDetail";
+import TeacherTopics from "@/pages/teacher/Topics";
+import TeacherTopicDetail from "@/pages/teacher/TopicDetail";
+import TeacherStudents from "@/pages/teacher/Students";
+import TeacherEvaluations from "@/pages/teacher/Evaluations";
 import StudentDashboard from "@/pages/student/Dashboard";
-import StudentClasses from "@/pages/student/Classes";
-import StudentAssignments from "@/pages/student/Assignments";
-import StudentAssignmentDetail from "@/pages/student/AssignmentDetail";
-import StudentGrades from "@/pages/student/Grades";
+import StudentTopics from "@/pages/student/Topics";
+import StudentTopicDetail from "@/pages/student/TopicDetail";
+import StudentEvaluations from "@/pages/student/Evaluations";
 
 function HomeRedirect() {
   const { user, loading } = useAuth();
@@ -45,6 +45,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<HomeRedirect />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
 
       <Route
         path="/teacher"
@@ -55,34 +56,34 @@ export default function App() {
         }
       />
       <Route
-        path="/teacher/classes"
+        path="/teacher/topics"
         element={
           <ProtectedRoute role="TEACHER">
-            <TeacherClasses />
+            <TeacherTopics />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/teacher/classes/:id"
+        path="/teacher/topics/:id"
         element={
           <ProtectedRoute role="TEACHER">
-            <TeacherClassDetail />
+            <TeacherTopicDetail />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/teacher/assignments"
+        path="/teacher/students"
         element={
           <ProtectedRoute role="TEACHER">
-            <TeacherAssignments />
+            <TeacherStudents />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/teacher/assignments/:id"
+        path="/teacher/evaluations"
         element={
           <ProtectedRoute role="TEACHER">
-            <TeacherAssignmentDetail />
+            <TeacherEvaluations />
           </ProtectedRoute>
         }
       />
@@ -96,34 +97,26 @@ export default function App() {
         }
       />
       <Route
-        path="/student/classes"
+        path="/student/topics"
         element={
           <ProtectedRoute role="STUDENT">
-            <StudentClasses />
+            <StudentTopics />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/student/assignments"
+        path="/student/topics/:id"
         element={
           <ProtectedRoute role="STUDENT">
-            <StudentAssignments />
+            <StudentTopicDetail />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/student/assignments/:id"
+        path="/student/evaluations"
         element={
           <ProtectedRoute role="STUDENT">
-            <StudentAssignmentDetail />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/student/grades"
-        element={
-          <ProtectedRoute role="STUDENT">
-            <StudentGrades />
+            <StudentEvaluations />
           </ProtectedRoute>
         }
       />
