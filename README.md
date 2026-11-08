@@ -17,17 +17,20 @@
 
 - **账号**：用**邮箱或手机号**注册 / 登录（自助注册）
 - **课题**：创建课题、编辑介绍页（支持 Markdown）、关闭/恢复课题
+- **课题管理**：仪表盘（统计 + 状态分布）+ 标题搜索 + 状态筛选 + 分页表格
 - **协作**：邀请**最多 3 名助教**共同管理；创建者权限**可移交**
 - **学生管理**：创建学生账号（姓名 + 默认用户名）；学生可被多位老师管理；
   - 用户名冲突时先展示已有账号信息，由老师判断「同一个人 → 加入我的管理」或「不同人 → 换用户名重新创建」
   - 可重置 / 关闭学生密码，但**永远看不到明文**
 - **成员**：把学生加入/移出课题（学生被动加入，不能自行进出；移出后保留历史）
 - **评价**：自定义课题的**多维评分维度** + 文字评语；一个提交可多次评价、保留历史
+- **工作台**：待评价队列、最近评价、我的课题紧凑表格
 - **评价汇总**：查看自己课题下的全部评价
 
 ### 学生端
 
 - **登录**：老师分配的**默认用户名（学号）**直接登录，默认无密码；可自行设置/清除密码
+- **工作台**：课题状态筛选（全部/未提交/已提交）+ 最近评价 + 账号安全
 - **我的课题**：当前课题 + 曾经加入过的历史课题
 - **课题介绍页**：Markdown 渲染
 - **提交**：文本（原样展示，不渲染 Markdown/LaTeX）+ 任意类型文件多文件上传；可重新提交
@@ -45,11 +48,22 @@
 
 ### 界面预览
 
-| 登录 | 教师工作台 | 学生课题 |
+| 登录 | 教师工作台 | 课题管理（仪表盘） |
 | --- | --- | --- |
-| ![登录页](docs/screenshots/01-login.png) | ![教师工作台](docs/screenshots/02-teacher-dashboard.png) | ![学生课题](docs/screenshots/07-student-dashboard.png) |
+| ![登录页](docs/screenshots/01-login.png) | ![教师工作台](docs/screenshots/02-teacher-dashboard.png) | ![课题管理](docs/screenshots/03-teacher-topics.png) |
+
+| 课题详情（教师） | 学生工作台 | 学生课题详情 |
+| --- | --- | --- |
+| ![教师课题详情](docs/screenshots/04-teacher-topic-detail.png) | ![学生工作台](docs/screenshots/07-student-dashboard.png) | ![学生课题详情](docs/screenshots/09-student-topic-detail.png) |
 
 截图在 [`docs/screenshots/`](docs/screenshots/)，由 `node scripts/capture-screenshots.mjs` 自动生成。
+
+### 当前状态
+
+- v3（课题-提交-评价）已完成：Go 后端 + React 前端 + Docker 单容器 3100
+- 验证：`scripts/verify-v3.mjs` 全流程 30 项通过；Go `vet/build/test` 通过；容器内复测通过
+- Git：`feat/topic-model` 分支 → PR #2（draft）
+- 浏览器插件 BrowserSkill 已接入（CLI + DSH 插件）；浏览器扩展需手动安装
 
 ---
 
