@@ -51,15 +51,17 @@ func (h *API) DownloadFile(w http.ResponseWriter, r *http.Request) {
 		mimeType     string
 		sizeBytes    int64
 		storagePath  string
-		studentID    string
+		studentID    sql.NullString
+		groupID      sql.NullString
 		topicID      string
 	)
 	err := h.DB.QueryRowContext(ctx,
 		`SELECT f.id, f.original_name, f.mime_type, f.size_bytes, f.storage_path,
-		        s.student_id, s.topic_id
+		        s.student_id, s.group_id, s.topic_id
 		 FROM submission_files f JOIN submissions s ON s.id = f.submission_id
 		 WHERE f.id = ?`, r.PathValue("fileId"),
-	).Scan(&fileID, &originalName, &mimeType, &sizeBytes, &storagePath, &studentID, &topicID)
+	).Scan(&fileID, &originalName, &mimeType, &sizeBytes, &storagePath,
+		&studentID, &groupID, &topicID)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "附件不存在")
 		return
@@ -72,7 +74,19 @@ func (h *API) DownloadFile(w http.ResponseWriter, r *http.Request) {
 	allowed := false
 	switch user.Role {
 	case roleStudent:
-		allowed = studentID == user.ID
+		if studentID.Valid && studentID.String == user.ID {
+			allowed = true
+		} else if groupID.Valid {
+			var count int
+			if err := h.DB.QueryRowContext(ctx,
+				`SELECT COUNT(*) FROM group_members WHERE group_id = ? AND student_id = ?`,
+				groupID.String, user.ID,
+			).Scan(&count); err != nil {
+				serverError(w, err)
+				return
+			}
+			allowed = count > 0
+		}
 	case roleTeacher:
 		topic, err := h.getTopic(ctx, topicID)
 		if err != nil {

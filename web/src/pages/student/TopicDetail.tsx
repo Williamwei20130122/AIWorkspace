@@ -4,6 +4,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { AppShell } from "@/components/shell/AppShell";
 import { EvaluationScores } from "@/components/student/EvaluationScores";
 import { formatFileSize } from "@/components/student/files";
+import { GroupPanel } from "@/components/student/GroupPanel";
 import { Markdown } from "@/components/student/Markdown";
 import { ErrorCard, LoadingCard } from "@/components/student/PageState";
 import { SubmitForm } from "@/components/student/SubmitForm";
@@ -17,6 +18,7 @@ import {
   IconCheck,
   IconClock,
   IconFile,
+  IconUsers,
 } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { ApiError, api, errorMessage } from "@/lib/api";
@@ -146,10 +148,33 @@ export default function StudentTopicDetail() {
     [...evaluations].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0] ?? null;
   const ownerName = data.owner?.name?.trim();
   const assistantNames = (data.assistants ?? []).map((assistant) => assistant.name).filter(Boolean);
-  const headerMeta = ownerName ? `${ownerName} 老师` : "课题";
-  const description = assistantNames.length
-    ? `${headerMeta} · 助教 ${assistantNames.join("、")}`
-    : headerMeta;
+  const className = data.class?.name?.trim();
+
+  // ---- v4：提交模式与分组 ----
+  const submitMode = data.submitMode ?? "INDIVIDUAL";
+  const isGroupMode = submitMode === "GROUP";
+  const groupMin = data.groupMin ?? 2;
+  const groupMax = data.groupMax ?? 4;
+  const allowStudentGroups = Boolean(data.allowStudentGroups);
+  const myGroup = data.myGroup ?? null;
+  const groups = data.groups ?? [];
+  const groupMemberCount = myGroup?.members.length ?? 0;
+  const groupBlockedReason = !isGroupMode
+    ? null
+    : !myGroup
+      ? allowStudentGroups
+        ? "你还没有加入小组：请先在「课题分组」里创建或加入小组，然后才能提交。"
+        : "老师还没有把你分到小组，分组后才能提交。"
+      : groupMemberCount < groupMin
+        ? `小组人数不足（${groupMemberCount}/${groupMin} 人），达到 ${groupMin} 人后才能提交。`
+        : null;
+
+  const metaParts = [
+    className ?? null,
+    ownerName ? `${ownerName} 老师` : null,
+    assistantNames.length ? `助教 ${assistantNames.join("、")}` : null,
+  ].filter(Boolean);
+  const description = metaParts.join(" · ") || "课题";
 
   return (
     <AppShell user={user}>
@@ -159,7 +184,12 @@ export default function StudentTopicDetail() {
         title={data.title}
         description={description}
         actions={
-          <Badge tone={closed ? "neutral" : "brand"}>{closed ? "已关闭" : "进行中"}</Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={closed ? "neutral" : "brand"}>{closed ? "已关闭" : "进行中"}</Badge>
+            <Badge tone={isGroupMode ? "info" : "neutral"}>
+              {isGroupMode ? "小组提交" : "个人提交"}
+            </Badge>
+          </div>
         }
       />
 
@@ -179,6 +209,35 @@ export default function StudentTopicDetail() {
         </CardContent>
       </Card>
 
+      {isGroupMode ? (
+        <Card className="mt-6">
+          <CardHeader>
+            <div>
+              <CardTitle>课题分组</CardTitle>
+              <CardDescription>
+                {allowStudentGroups
+                  ? `可自行创建或加入小组，每组 ${groupMin}–${groupMax} 人`
+                  : `由老师分组，每组 ${groupMin}–${groupMax} 人`}
+              </CardDescription>
+            </div>
+            <span className="grid size-9 place-items-center rounded-xl bg-brand-50 text-brand-600">
+              <IconUsers />
+            </span>
+          </CardHeader>
+          <CardContent>
+            <GroupPanel
+              topicId={data.id}
+              groupMin={groupMin}
+              groupMax={groupMax}
+              allowStudentGroups={allowStudentGroups}
+              myGroup={myGroup}
+              groups={groups}
+              onChanged={() => void load(false)}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="order-2 space-y-6 lg:order-1">
           <Card>
@@ -188,7 +247,9 @@ export default function StudentTopicDetail() {
                 <CardDescription>
                   {evaluated
                     ? "老师已评价，提交内容已锁定"
-                    : "老师会看到你最新一次提交的文本与附件"}
+                    : isGroupMode
+                      ? "本轮以小组为单位提交，组员共享这份提交与评价"
+                      : "老师会看到你最新一次提交的文本与附件"}
                 </CardDescription>
               </div>
               <Badge tone={submission ? "success" : "warning"}>
@@ -256,7 +317,9 @@ export default function StudentTopicDetail() {
             <CardHeader>
               <div>
                 <CardTitle>我的评价</CardTitle>
-                <CardDescription>老师对这份提交的历史评价</CardDescription>
+                <CardDescription>
+                  {isGroupMode ? "老师对小组提交的评价，组员都能看到" : "老师对这份提交的历史评价"}
+                </CardDescription>
               </div>
               <Badge tone="brand">{evaluations.length} 次</Badge>
             </CardHeader>
@@ -318,9 +381,21 @@ export default function StudentTopicDetail() {
             <Card>
               <CardHeader>
                 <div>
-                  <CardTitle>{submission ? "重新提交" : "提交"}</CardTitle>
+                  <CardTitle>
+                    {isGroupMode
+                      ? submission
+                        ? "重新提交"
+                        : "以小组身份提交"
+                      : submission
+                        ? "重新提交"
+                        : "提交"}
+                  </CardTitle>
                   <CardDescription>
-                    {closed ? "课题已关闭，提交已停止" : "文本 + 任意附件，可多次提交"}
+                    {closed
+                      ? "课题已关闭，提交已停止"
+                      : isGroupMode
+                        ? "小组共享一份提交与附件，组员都能看到"
+                        : "文本 + 任意附件，可多次提交"}
                   </CardDescription>
                 </div>
                 <span className="grid size-9 place-items-center rounded-xl bg-amber-50 text-amber-700">
@@ -332,6 +407,8 @@ export default function StudentTopicDetail() {
                   topicId={data.id}
                   closed={closed}
                   evaluated={evaluated}
+                  blockedReason={groupBlockedReason}
+                  groupMode={isGroupMode}
                   submission={submission}
                   onSubmitted={() => void load(false)}
                 />

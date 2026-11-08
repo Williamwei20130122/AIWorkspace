@@ -1,4 +1,4 @@
--- AIWorkspace 教学系统数据库结构（docs/CONTRACT.md v3 第 3 节）
+-- AIWorkspace 教学系统数据库结构（docs/CONTRACT.md v4：v3 第 3 节 + 第 10 节增量）
 -- 所有时间字段存 RFC3339（UTC）字符串，例如 2026-11-08T03:25:36Z。
 -- 启动时由程序执行本文件（CREATE TABLE IF NOT EXISTS，可重复执行）。
 
@@ -22,6 +22,25 @@ CREATE TABLE IF NOT EXISTS teacher_students (
   UNIQUE(teacher_id, student_id)
 );
 
+-- 班级：属于创建老师；学生从老师管理的学生中添加
+CREATE TABLE IF NOT EXISTS classes (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  grade TEXT,
+  teacher_id TEXT NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS class_members (
+  id TEXT PRIMARY KEY,
+  class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  student_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  joined_at TEXT NOT NULL,
+  removed_at TEXT,
+  UNIQUE(class_id, student_id)
+);
+
 CREATE TABLE IF NOT EXISTS topics (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
@@ -29,6 +48,11 @@ CREATE TABLE IF NOT EXISTS topics (
   owner_id TEXT NOT NULL REFERENCES users(id),
   status TEXT NOT NULL DEFAULT 'ACTIVE',
   join_mode TEXT NOT NULL DEFAULT 'ASSIGNED',
+  class_id TEXT REFERENCES classes(id),
+  submit_mode TEXT NOT NULL DEFAULT 'INDIVIDUAL',
+  group_min INTEGER NOT NULL DEFAULT 2,
+  group_max INTEGER NOT NULL DEFAULT 4,
+  allow_student_groups INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -52,15 +76,32 @@ CREATE TABLE IF NOT EXISTS topic_members (
   UNIQUE(topic_id, student_id)
 );
 
--- 每个学生在每个课题最多一份提交（重交覆盖）
+-- 课题内小组（老师或学生创建）
+CREATE TABLE IF NOT EXISTS topic_groups (
+  id TEXT PRIMARY KEY,
+  topic_id TEXT NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS group_members (
+  group_id TEXT NOT NULL REFERENCES topic_groups(id) ON DELETE CASCADE,
+  student_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  joined_at TEXT NOT NULL,
+  PRIMARY KEY(group_id, student_id)
+);
+
+-- 提交：个人提交 group_id 为空、student_id 非空；小组提交 group_id 非空、student_id 为空
 CREATE TABLE IF NOT EXISTS submissions (
   id TEXT PRIMARY KEY,
   topic_id TEXT NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
-  student_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  student_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+  group_id TEXT REFERENCES topic_groups(id) ON DELETE CASCADE,
+  submitted_by TEXT REFERENCES users(id),
   text_content TEXT NOT NULL DEFAULT '',
   updated_at TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  UNIQUE(topic_id, student_id)
+  created_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS submission_files (
@@ -98,22 +139,35 @@ CREATE TABLE IF NOT EXISTS evaluation_scores (
   UNIQUE(evaluation_id, dimension_id)
 );
 
--- 查询索引：登录、按教师 / 学生 / 课题过滤时使用
+-- 查询索引：登录、按教师 / 班级 / 学生 / 课题过滤时使用
 CREATE INDEX IF NOT EXISTS idx_users_login_id ON users(login_id);
 CREATE INDEX IF NOT EXISTS idx_users_created_by ON users(created_by);
 CREATE INDEX IF NOT EXISTS idx_teacher_students_teacher ON teacher_students(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_teacher_students_student ON teacher_students(student_id);
+CREATE INDEX IF NOT EXISTS idx_classes_teacher ON classes(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_class_members_class ON class_members(class_id);
+CREATE INDEX IF NOT EXISTS idx_class_members_student ON class_members(student_id);
 CREATE INDEX IF NOT EXISTS idx_topics_owner ON topics(owner_id);
 CREATE INDEX IF NOT EXISTS idx_topics_status ON topics(status);
+CREATE INDEX IF NOT EXISTS idx_topics_class ON topics(class_id);
 CREATE INDEX IF NOT EXISTS idx_topic_assistants_topic ON topic_assistants(topic_id);
 CREATE INDEX IF NOT EXISTS idx_topic_assistants_teacher ON topic_assistants(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_topic_members_topic ON topic_members(topic_id);
 CREATE INDEX IF NOT EXISTS idx_topic_members_student ON topic_members(student_id);
+CREATE INDEX IF NOT EXISTS idx_topic_groups_topic ON topic_groups(topic_id);
+CREATE INDEX IF NOT EXISTS idx_group_members_student ON group_members(student_id);
 CREATE INDEX IF NOT EXISTS idx_submissions_topic ON submissions(topic_id);
 CREATE INDEX IF NOT EXISTS idx_submissions_student ON submissions(student_id);
+CREATE INDEX IF NOT EXISTS idx_submissions_group ON submissions(group_id);
 CREATE INDEX IF NOT EXISTS idx_submission_files_submission ON submission_files(submission_id);
 CREATE INDEX IF NOT EXISTS idx_evaluation_dimensions_topic ON evaluation_dimensions(topic_id);
 CREATE INDEX IF NOT EXISTS idx_evaluations_submission ON evaluations(submission_id);
 CREATE INDEX IF NOT EXISTS idx_evaluations_teacher ON evaluations(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_evaluation_scores_evaluation ON evaluation_scores(evaluation_id);
 CREATE INDEX IF NOT EXISTS idx_evaluation_scores_dimension ON evaluation_scores(dimension_id);
+
+-- 唯一提交：个人提交 UNIQUE(topic_id, student_id)（group_id 为空）；小组提交 UNIQUE(topic_id, group_id)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_submissions_topic_student_individual
+  ON submissions(topic_id, student_id) WHERE group_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_submissions_topic_group
+  ON submissions(topic_id, group_id) WHERE group_id IS NOT NULL;

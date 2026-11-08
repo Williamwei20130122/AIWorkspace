@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FormMessage } from "@/components/ui/form";
@@ -7,9 +8,10 @@ import { IconClipboard, IconFile } from "@/components/ui/icons";
 import { EvaluationForm } from "@/components/teacher/EvaluationForm";
 import { EvaluationScores } from "@/components/teacher/EvaluationScores";
 import { PendingBadge } from "@/components/teacher/StatusBadge";
+import type { TeacherSubmissionRow } from "@/components/teacher/v4types";
 import { api, errorMessage } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
-import type { Dimension, SubmissionDetail, SubmissionSummary } from "@/lib/types";
+import type { Dimension, SubmissionDetail } from "@/lib/types";
 
 function formatFileSize(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
@@ -23,13 +25,30 @@ function newestFirst<T extends { createdAt: string }>(items: T[]): T[] {
   return [...items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
+/** 提交人名称：小组提交优先显示小组名，其次学生/提交人 */
+function submitterName(submission: TeacherSubmissionRow): string {
+  if (submission.group) return `小组：${submission.group.name}`;
+  return submission.student?.name ?? submission.submitter?.name ?? "未知提交人";
+}
+
+/** 提交人补充信息：学号（个人）或提交人（小组） */
+function submitterMeta(submission: TeacherSubmissionRow): string {
+  if (submission.group) {
+    return submission.submitter?.name
+      ? `小组提交 · 由 ${submission.submitter.name} 提交`
+      : "小组提交";
+  }
+  const loginId = submission.student?.loginId ?? submission.submitter?.loginId;
+  return loginId ? `学号 ${loginId}` : "个人提交";
+}
+
 /** 课题提交列表：展开可看文本内容、附件与评价历史，并直接评价 */
 export function SubmissionList({
   submissions,
   dimensions,
   onChanged,
 }: {
-  submissions: SubmissionSummary[];
+  submissions: TeacherSubmissionRow[];
   dimensions: Dimension[];
   onChanged: () => void;
 }) {
@@ -92,11 +111,14 @@ export function SubmissionList({
               onClick={() => void toggle(submission.id)}
               className="flex w-full flex-wrap items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-brand-50/50 sm:px-4"
             >
-              <Avatar name={submission.student.name} size="sm" />
+              <Avatar name={submitterName(submission)} size="sm" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-brand-900">{submission.student.name}</p>
+                <p className="flex flex-wrap items-center gap-1.5 truncate text-sm font-semibold text-brand-900">
+                  {submitterName(submission)}
+                  {submission.group ? <Badge tone="info">小组</Badge> : null}
+                </p>
                 <p className="truncate text-xs text-ink-soft">
-                  学号 {submission.student.loginId} · 提交于 {formatDateTime(submission.updatedAt)}
+                  {submitterMeta(submission)} · 提交于 {formatDateTime(submission.updatedAt)}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -114,7 +136,7 @@ export function SubmissionList({
                   <p className="mt-1.5 whitespace-pre-wrap break-words rounded-xl border border-line bg-white p-3 text-sm leading-6 text-ink">
                     {(detail?.textContent ?? submission.textContent).trim()
                       ? (detail?.textContent ?? submission.textContent)
-                      : "（学生没有填写文字内容）"}
+                      : "（没有填写文字内容）"}
                   </p>
                 </section>
 

@@ -31,6 +31,12 @@ const (
 
 	joinModeAssigned = "ASSIGNED"
 
+	submitModeIndividual = "INDIVIDUAL"
+	submitModeGroup      = "GROUP"
+
+	createdByTeacher = "teacher"
+	createdByStudent = "student"
+
 	// maxBodyBytes JSON 请求体大小上限（1MB，足够本系统的文本请求）。
 	maxBodyBytes = 1 << 20
 )
@@ -61,10 +67,27 @@ func (h *API) Mount(mux *http.ServeMux) {
 
 	// 教师端（需 TEACHER）
 	mux.HandleFunc("GET /api/teacher/overview", h.Auth.RequireRole(roleTeacher, h.TeacherOverview))
+
+	// 班级（v4）
+	mux.HandleFunc("GET /api/teacher/classes", h.Auth.RequireRole(roleTeacher, h.TeacherClasses))
+	mux.HandleFunc("POST /api/teacher/classes", h.Auth.RequireRole(roleTeacher, h.CreateClass))
+	mux.HandleFunc("GET /api/teacher/classes/{id}", h.Auth.RequireRole(roleTeacher, h.TeacherClassDetail))
+	mux.HandleFunc("PATCH /api/teacher/classes/{id}", h.Auth.RequireRole(roleTeacher, h.UpdateClass))
+	mux.HandleFunc("POST /api/teacher/classes/{id}/students", h.Auth.RequireRole(roleTeacher, h.AddClassStudent))
+	mux.HandleFunc("DELETE /api/teacher/classes/{id}/students/{studentId}", h.Auth.RequireRole(roleTeacher, h.RemoveClassStudent))
+
 	mux.HandleFunc("GET /api/teacher/topics", h.Auth.RequireRole(roleTeacher, h.TeacherTopics))
 	mux.HandleFunc("POST /api/teacher/topics", h.Auth.RequireRole(roleTeacher, h.CreateTopic))
 	mux.HandleFunc("GET /api/teacher/topics/{id}", h.Auth.RequireRole(roleTeacher, h.TeacherTopicDetail))
 	mux.HandleFunc("PATCH /api/teacher/topics/{id}", h.Auth.RequireRole(roleTeacher, h.UpdateTopic))
+	mux.HandleFunc("GET /api/teacher/topics/{id}/submissions", h.Auth.RequireRole(roleTeacher, h.TeacherTopicSubmissions))
+
+	mux.HandleFunc("POST /api/teacher/topics/{id}/groups", h.Auth.RequireRole(roleTeacher, h.CreateTopicGroup))
+	mux.HandleFunc("POST /api/teacher/topics/{id}/groups/random", h.Auth.RequireRole(roleTeacher, h.RandomGrouping))
+	mux.HandleFunc("PATCH /api/teacher/topics/{id}/groups/{groupId}", h.Auth.RequireRole(roleTeacher, h.RenameTopicGroup))
+	mux.HandleFunc("DELETE /api/teacher/topics/{id}/groups/{groupId}", h.Auth.RequireRole(roleTeacher, h.DeleteTopicGroup))
+	mux.HandleFunc("POST /api/teacher/topics/{id}/groups/{groupId}/members", h.Auth.RequireRole(roleTeacher, h.AddGroupMember))
+	mux.HandleFunc("DELETE /api/teacher/topics/{id}/groups/{groupId}/members/{studentId}", h.Auth.RequireRole(roleTeacher, h.RemoveGroupMember))
 
 	mux.HandleFunc("POST /api/teacher/topics/{id}/assistants", h.Auth.RequireRole(roleTeacher, h.AddAssistant))
 	mux.HandleFunc("DELETE /api/teacher/topics/{id}/assistants/{teacherId}", h.Auth.RequireRole(roleTeacher, h.RemoveAssistant))
@@ -91,9 +114,13 @@ func (h *API) Mount(mux *http.ServeMux) {
 
 	// 学生端（需 STUDENT）
 	mux.HandleFunc("GET /api/student/overview", h.Auth.RequireRole(roleStudent, h.StudentOverview))
+	mux.HandleFunc("GET /api/student/classes", h.Auth.RequireRole(roleStudent, h.StudentClasses))
 	mux.HandleFunc("GET /api/student/topics", h.Auth.RequireRole(roleStudent, h.StudentTopics))
 	mux.HandleFunc("GET /api/student/topics/{id}", h.Auth.RequireRole(roleStudent, h.StudentTopicDetail))
 	mux.HandleFunc("POST /api/student/topics/{id}/submission", h.Auth.RequireRole(roleStudent, h.SubmitTopicSubmission))
+	mux.HandleFunc("POST /api/student/topics/{id}/groups", h.Auth.RequireRole(roleStudent, h.StudentCreateGroup))
+	mux.HandleFunc("POST /api/student/topics/{id}/groups/leave", h.Auth.RequireRole(roleStudent, h.StudentLeaveGroup))
+	mux.HandleFunc("POST /api/student/topics/{id}/groups/{groupId}/join", h.Auth.RequireRole(roleStudent, h.StudentJoinGroup))
 	mux.HandleFunc("GET /api/student/evaluations", h.Auth.RequireRole(roleStudent, h.StudentEvaluations))
 
 	// 附件下载：学生本人或管理该课题的老师都可以下载，因此只要求登录。
@@ -190,30 +217,48 @@ func trimmedOr(value, fallback string) string {
 
 // topicRow 是处理权限与详情时用到的课题原始行。
 type topicRow struct {
-	ID            string
-	Title         string
-	DescriptionMD string
-	Status        string
-	JoinMode      string
-	OwnerID       string
-	OwnerName     string
-	CreatedAt     string
-	UpdatedAt     string
+	ID                 string
+	Title              string
+	DescriptionMD      string
+	Status             string
+	JoinMode           string
+	OwnerID            string
+	OwnerName          string
+	ClassID            *string
+	ClassName          string
+	SubmitMode         string
+	GroupMin           int
+	GroupMax           int
+	AllowStudentGroups bool
+	CreatedAt          string
+	UpdatedAt          string
 }
 
-// getTopic 按 id 读取课题（含创建者姓名）；不存在返回 sql.ErrNoRows。
+// getTopic 按 id 读取课题（含创建者姓名与班级）；不存在返回 sql.ErrNoRows。
 func (h *API) getTopic(ctx context.Context, id string) (*topicRow, error) {
-	var topic topicRow
+	var (
+		topic     topicRow
+		classID   sql.NullString
+		className sql.NullString
+	)
 	err := h.DB.QueryRowContext(ctx,
 		`SELECT t.id, t.title, t.description_md, t.status, t.join_mode, t.owner_id,
-		        COALESCE(u.name, ''), t.created_at, t.updated_at
-		 FROM topics t LEFT JOIN users u ON u.id = t.owner_id
+		        COALESCE(u.name, ''), t.class_id, COALESCE(c.name, ''),
+		        t.submit_mode, t.group_min, t.group_max, t.allow_student_groups,
+		        t.created_at, t.updated_at
+		 FROM topics t
+		 LEFT JOIN users u ON u.id = t.owner_id
+		 LEFT JOIN classes c ON c.id = t.class_id
 		 WHERE t.id = ?`, id,
 	).Scan(&topic.ID, &topic.Title, &topic.DescriptionMD, &topic.Status, &topic.JoinMode,
-		&topic.OwnerID, &topic.OwnerName, &topic.CreatedAt, &topic.UpdatedAt)
+		&topic.OwnerID, &topic.OwnerName, &classID, &className,
+		&topic.SubmitMode, &topic.GroupMin, &topic.GroupMax, &topic.AllowStudentGroups,
+		&topic.CreatedAt, &topic.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
+	topic.ClassID = strPtr(classID)
+	topic.ClassName = className.String
 	return &topic, nil
 }
 

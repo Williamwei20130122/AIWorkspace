@@ -14,14 +14,16 @@ import (
 // DemoPassword 演示账号统一密码。
 const DemoPassword = "demo1234"
 
-// Seed 在 users 表为空时写入 v3 演示数据；返回是否真正写入了数据。
+// Seed 在 users 表为空时写入 v4 演示数据；返回是否真正写入了数据。
 //
-// 演示数据与 docs/CONTRACT.md 第 8 节保持一致：
+// 演示数据与 docs/CONTRACT.md 第 10.5 节（v4）保持一致：
 //   - 教师 王老师 teacher@demo.edu、李老师 li@demo.edu（密码 demo1234）
 //   - 学生 李小明 S001（无密码）、张小红 S002（demo1234）、
 //     陈小军 S003（无密码）、刘小美 S004（无密码）
-//   - 3 个课题（含 1 个 CLOSED 与 1 个已移出的历史成员）、评价维度、提交与评价
-//   - 课题 1 李小明提交的 2 个演示附件会写入 UPLOAD_DIR
+//   - 2 个班级（初二（3）班：S001–S004；数学兴趣小组：S001/S002）
+//   - 3 个课题：课题 1 为小组模式（2 个小组、小组提交 + 评价），
+//     课题 2 个人模式，课题 3 已结题且 S002 为历史成员
+//   - 课题 1 小组提交的 2 个演示附件会写入 UPLOAD_DIR
 func Seed(db *sql.DB, uploadDir string) (bool, error) {
 	var count int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count); err != nil {
@@ -72,19 +74,55 @@ func seedTx(tx *sql.Tx, uploadDir string) error {
 		)
 		return id, err
 	}
-	insertTopic := func(title, descriptionMD, ownerID, status, createdAt, updatedAt string) (string, error) {
-		id := NewID("t")
+	insertClass := func(name string, grade *string, teacherID, createdAt string) (string, error) {
+		id := NewID("c")
 		_, err := tx.Exec(
-			`INSERT INTO topics (id, title, description_md, owner_id, status, join_mode, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, 'ASSIGNED', ?, ?)`,
-			id, title, descriptionMD, ownerID, status, createdAt, updatedAt,
+			`INSERT INTO classes (id, name, grade, teacher_id, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?)`,
+			id, name, nullString(grade), teacherID, createdAt, createdAt,
 		)
 		return id, err
 	}
-	insertMember := func(topicID, studentID, joinedAt string, removedAt *string) error {
+	insertClassMember := func(classID, studentID, joinedAt string, removedAt *string) error {
+		_, err := tx.Exec(
+			`INSERT INTO class_members (id, class_id, student_id, joined_at, removed_at)
+			 VALUES (?, ?, ?, ?, ?)`,
+			NewID("cm"), classID, studentID, joinedAt, nullString(removedAt),
+		)
+		return err
+	}
+	insertTopic := func(title, descriptionMD, ownerID, status, classID, submitMode string,
+		groupMin, groupMax int, allowStudentGroups bool, createdAt, updatedAt string) (string, error) {
+		id := NewID("t")
+		_, err := tx.Exec(
+			`INSERT INTO topics (id, title, description_md, owner_id, status, join_mode,
+			                     class_id, submit_mode, group_min, group_max, allow_student_groups,
+			                     created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, 'ASSIGNED', ?, ?, ?, ?, ?, ?, ?)`,
+			id, title, descriptionMD, ownerID, status, classID, submitMode,
+			groupMin, groupMax, allowStudentGroups, createdAt, updatedAt,
+		)
+		return id, err
+	}
+	insertTopicMember := func(topicID, studentID, joinedAt string, removedAt *string) error {
 		_, err := tx.Exec(
 			`INSERT INTO topic_members (id, topic_id, student_id, joined_at, removed_at) VALUES (?, ?, ?, ?, ?)`,
 			NewID("tm"), topicID, studentID, joinedAt, nullString(removedAt),
+		)
+		return err
+	}
+	insertGroup := func(topicID, name, createdBy, createdAt string) (string, error) {
+		id := NewID("g")
+		_, err := tx.Exec(
+			`INSERT INTO topic_groups (id, topic_id, name, created_by, created_at) VALUES (?, ?, ?, ?, ?)`,
+			id, topicID, name, createdBy, createdAt,
+		)
+		return id, err
+	}
+	insertGroupMember := func(groupID, studentID, joinedAt string) error {
+		_, err := tx.Exec(
+			`INSERT INTO group_members (group_id, student_id, joined_at) VALUES (?, ?, ?)`,
+			groupID, studentID, joinedAt,
 		)
 		return err
 	}
@@ -97,12 +135,15 @@ func seedTx(tx *sql.Tx, uploadDir string) error {
 		)
 		return id, err
 	}
-	insertSubmission := func(topicID, studentID, textContent, createdAt, updatedAt string) (string, error) {
+	insertSubmission := func(topicID string, studentID, groupID, submittedBy *string,
+		textContent, createdAt, updatedAt string) (string, error) {
 		id := NewID("s")
 		_, err := tx.Exec(
-			`INSERT INTO submissions (id, topic_id, student_id, text_content, updated_at, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?)`,
-			id, topicID, studentID, textContent, updatedAt, createdAt,
+			`INSERT INTO submissions (id, topic_id, student_id, group_id, submitted_by,
+			                          text_content, updated_at, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			id, topicID, nullString(studentID), nullString(groupID), nullString(submittedBy),
+			textContent, updatedAt, createdAt,
 		)
 		return id, err
 	}
@@ -165,10 +206,34 @@ func seedTx(tx *sql.Tx, uploadDir string) error {
 		}
 	}
 
+	// ---------- 班级（v4） ----------
+	grade := "初二"
+	mainClassID, err := insertClass("初二（3）班", &grade, wangID, past(24*day))
+	if err != nil {
+		return fmt.Errorf("写入班级失败: %w", err)
+	}
+	clubClassID, err := insertClass("数学兴趣小组", &grade, wangID, past(20*day))
+	if err != nil {
+		return fmt.Errorf("写入班级失败: %w", err)
+	}
+	classMembers := []struct {
+		classID   string
+		studentID string
+	}{
+		{mainClassID, limingID}, {mainClassID, xiaohongID},
+		{mainClassID, xiaojunID}, {mainClassID, xiaomeiID},
+		{clubClassID, limingID}, {clubClassID, xiaohongID},
+	}
+	for _, member := range classMembers {
+		if err := insertClassMember(member.classID, member.studentID, past(24*day), nil); err != nil {
+			return fmt.Errorf("写入班级成员失败: %w", err)
+		}
+	}
+
 	// ---------- 课题 ----------
 	weatherDescription := `# 校园气象站数据记录
 
-本课题围绕校园气象站，开展为期两周的数据采集与分析。
+本课题围绕校园气象站，开展为期两周的数据采集与分析。本课题为**小组合作**，请以小组为单位提交。
 
 ## 任务要求
 
@@ -183,7 +248,7 @@ func seedTx(tx *sql.Tx, uploadDir string) error {
 
 	bookDescription := `# 班级图书角运营方案
 
-为班级图书角设计一套可持续的运营方案。
+为班级图书角设计一套可持续的运营方案（个人独立完成）。
 
 ## 需要包含
 
@@ -201,15 +266,18 @@ func seedTx(tx *sql.Tx, uploadDir string) error {
 
 本课题已经结题，提交与评价保留用于回顾与展示。`
 
-	weatherTopicID, err := insertTopic("校园气象站数据记录", weatherDescription, wangID, "ACTIVE", past(12*day), past(2*day))
+	weatherTopicID, err := insertTopic("校园气象站数据记录", weatherDescription, wangID, "ACTIVE",
+		mainClassID, "GROUP", 2, 4, true, past(12*day), past(2*day))
 	if err != nil {
 		return fmt.Errorf("写入课题失败: %w", err)
 	}
-	bookTopicID, err := insertTopic("班级图书角运营方案", bookDescription, wangID, "ACTIVE", past(10*day), past(4*day))
+	bookTopicID, err := insertTopic("班级图书角运营方案", bookDescription, wangID, "ACTIVE",
+		mainClassID, "INDIVIDUAL", 2, 4, false, past(10*day), past(4*day))
 	if err != nil {
 		return fmt.Errorf("写入课题失败: %w", err)
 	}
-	plantTopicID, err := insertTopic("校园植物观察（已结题）", plantDescription, wangID, "CLOSED", past(20*day), past(6*day))
+	plantTopicID, err := insertTopic("校园植物观察（已结题）", plantDescription, wangID, "CLOSED",
+		mainClassID, "INDIVIDUAL", 2, 4, false, past(20*day), past(6*day))
 	if err != nil {
 		return fmt.Errorf("写入课题失败: %w", err)
 	}
@@ -223,7 +291,7 @@ func seedTx(tx *sql.Tx, uploadDir string) error {
 	}
 
 	// ---------- 课题成员 ----------
-	members := []struct {
+	topicMembers := []struct {
 		topicID   string
 		studentID string
 		joinedAt  string
@@ -233,12 +301,36 @@ func seedTx(tx *sql.Tx, uploadDir string) error {
 		{weatherTopicID, xiaohongID, past(11 * day), nil},
 		{weatherTopicID, xiaojunID, past(11 * day), nil},
 		{bookTopicID, limingID, past(9 * day), nil},
+		{bookTopicID, xiaohongID, past(9 * day), nil},
 		{bookTopicID, xiaomeiID, past(9 * day), nil},
 		{plantTopicID, xiaohongID, past(19 * day), stringPtr(past(5 * day))},
 	}
-	for _, member := range members {
-		if err := insertMember(member.topicID, member.studentID, member.joinedAt, member.removedAt); err != nil {
+	for _, member := range topicMembers {
+		if err := insertTopicMember(member.topicID, member.studentID, member.joinedAt, member.removedAt); err != nil {
 			return fmt.Errorf("写入课题成员失败: %w", err)
+		}
+	}
+
+	// ---------- 课题 1 分组（老师建组） ----------
+	weatherGroupA, err := insertGroup(weatherTopicID, "气象观测一组", "teacher", past(11*day))
+	if err != nil {
+		return fmt.Errorf("写入小组失败: %w", err)
+	}
+	weatherGroupB, err := insertGroup(weatherTopicID, "气象观测二组", "teacher", past(11*day))
+	if err != nil {
+		return fmt.Errorf("写入小组失败: %w", err)
+	}
+	groupAssignments := []struct {
+		groupID   string
+		studentID string
+	}{
+		{weatherGroupA, limingID},
+		{weatherGroupA, xiaojunID},
+		{weatherGroupB, xiaohongID},
+	}
+	for _, assignment := range groupAssignments {
+		if err := insertGroupMember(assignment.groupID, assignment.studentID, past(11*day)); err != nil {
+			return fmt.Errorf("写入小组成员失败: %w", err)
 		}
 	}
 
@@ -261,9 +353,9 @@ func seedTx(tx *sql.Tx, uploadDir string) error {
 		dimensionIDs = append(dimensionIDs, id)
 	}
 
-	// ---------- 提交 ----------
-	limingSubmissionID, err := insertSubmission(weatherTopicID, limingID,
-		`已完成校园气象站连续 10 天的数据记录。
+	// ---------- 提交：课题 1 小组 A 的小组提交（李小明提交） ----------
+	groupSubmissionID, err := insertSubmission(weatherTopicID, nil, &weatherGroupA, &limingID,
+		`我们小组完成了校园气象站连续 10 天的数据记录。
 记录表见附件一，气温变化折线图说明见附件二。
 
 分析：11 月中旬昼夜温差逐渐增大，午后 14:00 前后气温最高；晴天湿度明显低于阴天，风速与降温过程相关性较强。`,
@@ -271,20 +363,8 @@ func seedTx(tx *sql.Tx, uploadDir string) error {
 	if err != nil {
 		return fmt.Errorf("写入提交失败: %w", err)
 	}
-	if _, err := insertSubmission(weatherTopicID, xiaohongID,
-		`已提交：完成了 10 天的数据记录表，折线图正在绘制中。`,
-		past(26*time.Hour), past(20*time.Hour)); err != nil {
-		return fmt.Errorf("写入提交失败: %w", err)
-	}
-	plantSubmissionID, err := insertSubmission(plantTopicID, xiaohongID,
-		`我观察的是教学楼前的桂花树。
-记录内容：叶色、花苞数量、开花时间与天气的对应关系，附 8 张观察照片（已整理进文档）。`,
-		past(12*24*time.Hour), past(10*24*time.Hour))
-	if err != nil {
-		return fmt.Errorf("写入提交失败: %w", err)
-	}
 
-	// ---------- 演示附件（课题 1 李小明：2 个文件） ----------
+	// ---------- 演示附件（课题 1 小组提交：2 个文件） ----------
 	demoFiles := []struct {
 		originalName string
 		extension    string
@@ -324,23 +404,23 @@ func seedTx(tx *sql.Tx, uploadDir string) error {
 	}
 	for _, demo := range demoFiles {
 		fileID := NewID("f")
-		storagePath := path.Join("submissions", limingSubmissionID, fileID+demo.extension)
+		storagePath := path.Join("submissions", groupSubmissionID, fileID+demo.extension)
 		if err := writeSeedFile(uploadDir, storagePath, demo.content); err != nil {
 			return fmt.Errorf("写入演示附件失败: %w", err)
 		}
 		if _, err := tx.Exec(
 			`INSERT INTO submission_files (id, submission_id, original_name, mime_type, size_bytes, storage_path, created_at)
 			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			fileID, limingSubmissionID, demo.originalName, mimeTypeForExtension(demo.extension),
+			fileID, groupSubmissionID, demo.originalName, mimeTypeForExtension(demo.extension),
 			int64(len(demo.content)), storagePath, past(30*time.Hour),
 		); err != nil {
 			return fmt.Errorf("写入演示附件记录失败: %w", err)
 		}
 	}
 
-	// ---------- 评价 ----------
-	weatherEvaluationID, err := insertEvaluation(limingSubmissionID, wangID,
-		"数据完整、记录规范，折线图说明抓住了昼夜温差与湿度变化；分析部分可以再补充一周的对比数据。",
+	// ---------- 评价：课题 1 小组提交的评价 ----------
+	weatherEvaluationID, err := insertEvaluation(groupSubmissionID, wangID,
+		"小组分工明确，数据完整、记录规范，折线图说明抓住了昼夜温差与湿度变化；分析部分可以再补充一周的对比数据。",
 		past(26*time.Hour))
 	if err != nil {
 		return fmt.Errorf("写入评价失败: %w", err)
@@ -350,11 +430,6 @@ func seedTx(tx *sql.Tx, uploadDir string) error {
 		if err := insertScore(weatherEvaluationID, dimensionID, weatherScores[index]); err != nil {
 			return fmt.Errorf("写入评价分数失败: %w", err)
 		}
-	}
-	if _, err := insertEvaluation(plantSubmissionID, wangID,
-		"观察记录完整，能结合天气记录分析开花时间；课题已结题，作为过程性评价保留。",
-		past(8*24*time.Hour)); err != nil {
-		return fmt.Errorf("写入评价失败: %w", err)
 	}
 
 	return nil

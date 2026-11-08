@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -26,12 +27,12 @@ func (h *API) StudentOverview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type topicRow struct {
-		ID, Title, Status, UpdatedAt, OwnerName string
-		RemovedAt                               *string
+		ID, Title, Status, UpdatedAt, OwnerName, SubmitMode string
+		RemovedAt                                           *string
 	}
 	topics := make([]topicRow, 0)
 	rows, err := h.DB.QueryContext(ctx,
-		`SELECT t.id, t.title, t.status, t.updated_at, COALESCE(ou.name, ''), m.removed_at
+		`SELECT t.id, t.title, t.status, t.updated_at, COALESCE(ou.name, ''), t.submit_mode, m.removed_at
 		 FROM topic_members m
 		 JOIN topics t ON t.id = m.topic_id
 		 LEFT JOIN users ou ON ou.id = t.owner_id
@@ -47,7 +48,7 @@ func (h *API) StudentOverview(w http.ResponseWriter, r *http.Request) {
 			removedAt sql.NullString
 		)
 		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.UpdatedAt,
-			&item.OwnerName, &removedAt); err != nil {
+			&item.OwnerName, &item.SubmitMode, &removedAt); err != nil {
 			_ = rows.Close()
 			serverError(w, err)
 			return
@@ -63,7 +64,8 @@ func (h *API) StudentOverview(w http.ResponseWriter, r *http.Request) {
 	_ = rows.Close()
 
 	for _, topic := range topics {
-		submissionID, err := h.mySubmissionID(ctx, topic.ID, user.ID)
+		submissionID, err := h.studentSubmissionForTopicRef(ctx,
+			&topicRef{ID: topic.ID, SubmitMode: topic.SubmitMode}, user.ID)
 		if err != nil {
 			serverError(w, err)
 			return
@@ -90,6 +92,7 @@ func (h *API) StudentOverview(w http.ResponseWriter, r *http.Request) {
 			Title:           topic.Title,
 			Status:          topic.Status,
 			Owner:           models.NameOnly{Name: topic.OwnerName},
+			SubmissionMode:  topic.SubmitMode,
 			EvaluationCount: evaluationCount,
 			Submitted:       submitted,
 			UpdatedAt:       topic.UpdatedAt,
@@ -106,11 +109,44 @@ func (h *API) StudentOverview(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, overview)
 }
 
-// mySubmissionID 返回学生在某课题下的提交 id；没有提交时返回空串。
+// topicRef 是仅用于提交解析的最小课题信息。
+type topicRef struct {
+	ID         string
+	SubmitMode string
+}
+
+// studentSubmissionForTopicRef 是 studentSubmissionForTopic 的最小字段版本。
+func (h *API) studentSubmissionForTopicRef(ctx context.Context, ref *topicRef, studentID string) (string, error) {
+	if ref.SubmitMode == submitModeGroup {
+		group, err := h.studentGroupRow(ctx, ref.ID, studentID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		if err != nil {
+			return "", err
+		}
+		var submissionID string
+		err = h.DB.QueryRowContext(ctx,
+			`SELECT id FROM submissions WHERE topic_id = ? AND group_id = ?`,
+			ref.ID, group.ID,
+		).Scan(&submissionID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		if err != nil {
+			return "", err
+		}
+		return submissionID, nil
+	}
+	return h.mySubmissionID(ctx, ref.ID, studentID)
+}
+
+// mySubmissionID 返回学生在某课题下的个人提交 id；没有提交时返回空串。
 func (h *API) mySubmissionID(ctx context.Context, topicID, studentID string) (string, error) {
 	var submissionID string
 	err := h.DB.QueryRowContext(ctx,
-		`SELECT id FROM submissions WHERE topic_id = ? AND student_id = ?`, topicID, studentID,
+		`SELECT id FROM submissions WHERE topic_id = ? AND student_id = ? AND group_id IS NULL`,
+		topicID, studentID,
 	).Scan(&submissionID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
@@ -124,13 +160,12 @@ func (h *API) mySubmissionID(ctx context.Context, topicID, studentID string) (st
 // StudentTopics GET /api/student/topics（含历史课题）。
 func (h *API) StudentTopics(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	rows, err := h.DB.QueryContext(r.Context(),
-		`SELECT t.id, t.title, t.status, COALESCE(ou.name, ''), t.updated_at, m.removed_at,
-		        CASE WHEN s.id IS NULL THEN 0 ELSE 1 END
+	ctx := r.Context()
+	rows, err := h.DB.QueryContext(ctx,
+		`SELECT t.id, t.title, t.status, COALESCE(ou.name, ''), t.updated_at, m.removed_at, t.submit_mode
 		 FROM topic_members m
 		 JOIN topics t ON t.id = m.topic_id
 		 LEFT JOIN users ou ON ou.id = t.owner_id
-		 LEFT JOIN submissions s ON s.topic_id = t.id AND s.student_id = m.student_id
 		 WHERE m.student_id = ?
 		 ORDER BY (m.removed_at IS NOT NULL), t.updated_at DESC, t.id`, user.ID)
 	if err != nil {
@@ -145,21 +180,30 @@ func (h *API) StudentTopics(w http.ResponseWriter, r *http.Request) {
 			item      models.StudentTopic
 			ownerName string
 			removedAt sql.NullString
-			submitted int
 		)
 		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &ownerName,
-			&item.UpdatedAt, &removedAt, &submitted); err != nil {
+			&item.UpdatedAt, &removedAt, &item.SubmitMode); err != nil {
 			serverError(w, err)
 			return
 		}
 		item.Owner = models.NameOnly{Name: ownerName}
 		item.RemovedAt = strPtr(removedAt)
-		item.Submitted = submitted == 1
 		topics = append(topics, item)
 	}
 	if err := rows.Err(); err != nil {
 		serverError(w, err)
 		return
+	}
+	_ = rows.Close()
+
+	for index := range topics {
+		submissionID, err := h.studentSubmissionForTopicRef(ctx,
+			&topicRef{ID: topics[index].ID, SubmitMode: topics[index].SubmitMode}, user.ID)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		topics[index].Submitted = submissionID != ""
 	}
 	writeJSON(w, http.StatusOK, topics)
 }
@@ -179,25 +223,30 @@ func (h *API) StudentTopicDetail(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	membership, err := h.getMembership(ctx, topicID, user.ID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if _, err := h.getMembership(ctx, topicID, user.ID); errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusForbidden, "无权访问该课题")
 		return
-	}
-	if err != nil {
+	} else if err != nil {
 		serverError(w, err)
 		return
 	}
-	_ = membership
 
 	detail := models.StudentTopicDetail{
-		ID:            topic.ID,
-		Title:         topic.Title,
-		DescriptionMD: topic.DescriptionMD,
-		Status:        topic.Status,
-		Owner:         models.NameOnly{Name: topic.OwnerName},
-		Assistants:    []models.NameOnly{},
-		MyEvaluations: []models.StudentEvaluationBrief{},
+		ID:                 topic.ID,
+		Title:              topic.Title,
+		DescriptionMD:      topic.DescriptionMD,
+		Status:             topic.Status,
+		Owner:              models.NameOnly{Name: topic.OwnerName},
+		SubmitMode:         topic.SubmitMode,
+		GroupMin:           topic.GroupMin,
+		GroupMax:           topic.GroupMax,
+		AllowStudentGroups: topic.AllowStudentGroups,
+		Assistants:         []models.NameOnly{},
+		Groups:             []models.StudentGroup{},
+		MyEvaluations:      []models.StudentEvaluationBrief{},
+	}
+	if topic.ClassID != nil {
+		detail.Class = &models.IDName{ID: *topic.ClassID, Name: topic.ClassName}
 	}
 
 	// 助教（只展示姓名）
@@ -224,8 +273,30 @@ func (h *API) StudentTopicDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = rows.Close()
 
-	// 我的提交
-	submissionID, err := h.mySubmissionID(ctx, topicID, user.ID)
+	// 我的小组 / 全部小组（v4）
+	group, err := h.studentGroupRow(ctx, topicID, user.ID)
+	if err == nil {
+		myGroup, err := h.buildMyGroup(ctx, group)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		detail.MyGroup = myGroup
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		serverError(w, err)
+		return
+	}
+	if topic.AllowStudentGroups {
+		groups, err := h.loadStudentGroups(ctx, topicID)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		detail.Groups = groups
+	}
+
+	// 我的提交（GROUP 模式返回小组提交）
+	submissionID, err := h.studentSubmissionForTopic(ctx, topic, user.ID)
 	if err != nil {
 		serverError(w, err)
 		return
@@ -312,15 +383,17 @@ func (h *API) StudentTopicDetail(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, detail)
 }
 
-// studentEvaluations 读取学生的评价历史；limit <= 0 表示不限制。
+// studentEvaluations 读取学生的评价历史（含小组提交的评价）；limit <= 0 表示不限制。
 func (h *API) studentEvaluations(ctx context.Context, studentID string, limit int) ([]models.StudentEvaluationItem, error) {
 	query := `SELECT e.id, e.created_at, e.comment, t.id, t.title
 		FROM evaluations e
 		JOIN submissions s ON s.id = e.submission_id
 		JOIN topics t ON t.id = s.topic_id
 		WHERE s.student_id = ?
+		   OR EXISTS (SELECT 1 FROM group_members gm
+		              WHERE gm.group_id = s.group_id AND gm.student_id = ?)
 		ORDER BY e.created_at DESC, e.id DESC`
-	args := []any{studentID}
+	args := []any{studentID, studentID}
 	if limit > 0 {
 		query += ` LIMIT ?`
 		args = append(args, limit)
@@ -375,7 +448,7 @@ func (h *API) StudentEvaluations(w http.ResponseWriter, r *http.Request) {
 }
 
 /* ------------------------------------------------------------------ */
-/* 学生提交（multipart：文本 + 多附件）                                */
+/* 学生提交（multipart：文本 + 多附件；v4 支持小组提交）               */
 /* ------------------------------------------------------------------ */
 
 // SubmitTopicSubmission POST /api/student/topics/{id}/submission。
@@ -411,8 +484,33 @@ func (h *API) SubmitTopicSubmission(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 已评价的提交不允许重新提交（保证评价结果稳定）。
-	submissionID, err := h.mySubmissionID(ctx, topicID, user.ID)
+	// 按提交模式确定本次提交归属的小组 / 个人，并检查小组人数。
+	var groupID *string
+	if topic.SubmitMode == submitModeGroup {
+		group, err := h.studentGroupRow(ctx, topicID, user.ID)
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusBadRequest, "请先加入小组再提交")
+			return
+		}
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		memberCount, err := h.groupMemberCount(ctx, group.ID)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		if memberCount < topic.GroupMin {
+			writeError(w, http.StatusBadRequest,
+				fmt.Sprintf("小组人数不足，至少需要 %d 人才能提交", topic.GroupMin))
+			return
+		}
+		groupID = &group.ID
+	}
+
+	// 已评价的提交不允许重新提交（个人 / 小组一致）。
+	submissionID, err := h.studentSubmissionForTopic(ctx, topic, user.ID)
 	if err != nil {
 		serverError(w, err)
 		return
@@ -507,8 +605,19 @@ func (h *API) SubmitTopicSubmission(w http.ResponseWriter, r *http.Request) {
 
 	if existing {
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE submissions SET text_content = ?, updated_at = ? WHERE id = ?`,
-			textContent, timestamp, submissionID,
+			`UPDATE submissions SET text_content = ?, updated_at = ?, submitted_by = ? WHERE id = ?`,
+			textContent, timestamp, user.ID, submissionID,
+		); err != nil {
+			cleanupNewFiles()
+			serverError(w, err)
+			return
+		}
+	} else if topic.SubmitMode == submitModeGroup {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO submissions (id, topic_id, student_id, group_id, submitted_by,
+			                          text_content, updated_at, created_at)
+			 VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`,
+			submissionID, topicID, *groupID, user.ID, textContent, timestamp, timestamp,
 		); err != nil {
 			cleanupNewFiles()
 			serverError(w, err)
@@ -516,9 +625,10 @@ func (h *API) SubmitTopicSubmission(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO submissions (id, topic_id, student_id, text_content, updated_at, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?)`,
-			submissionID, topicID, user.ID, textContent, timestamp, timestamp,
+			`INSERT INTO submissions (id, topic_id, student_id, group_id, submitted_by,
+			                          text_content, updated_at, created_at)
+			 VALUES (?, ?, ?, NULL, ?, ?, ?, ?)`,
+			submissionID, topicID, user.ID, user.ID, textContent, timestamp, timestamp,
 		); err != nil {
 			cleanupNewFiles()
 			serverError(w, err)

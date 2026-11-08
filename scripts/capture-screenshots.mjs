@@ -155,11 +155,19 @@ await cdp(page.webSocketDebuggerUrl, async ({ send, once }) => {
   );
   if (teacherTopicId) await shot("04-teacher-topic-detail", `/teacher/topics/${teacherTopicId}`);
 
+  // v4：班级管理
+  const teacherClassId = await evaluate(
+    `fetch("/api/teacher/classes",{credentials:"same-origin"}).then(r=>r.json()).then(xs=>xs[0]&&xs[0].id)`,
+  );
+  await shot("11-teacher-classes", "/teacher/classes");
+  if (teacherClassId) await shot("12-teacher-class-detail", `/teacher/classes/${teacherClassId}`);
+
   // 学生（S001 无密码）
   await login("S001", "");
   await shot("07-student-dashboard", "/student");
   await shot("08-student-topics", "/student/topics");
   await shot("10-student-evaluations", "/student/evaluations");
+  await shot("13-student-classes", "/student/classes");
   const studentTopicId = await evaluate(
     `fetch("/api/student/topics",{credentials:"same-origin"}).then(r=>r.json()).then(xs=>xs[0]&&xs[0].id)`,
   );

@@ -94,26 +94,33 @@ func Migrate(db *sql.DB) error {
 	return nil
 }
 
-// legacyTables 是 v2 及 v3 可能出现的全部表名，按“子表在前”的顺序重建。
+// legacyTables 是 v2 / v3 可能出现的全部表名，按“子表在前”的顺序重建。
 var legacyTables = []string{
 	"evaluation_scores",
 	"evaluation_dimensions",
 	"evaluations",
 	"submission_files",
+	"group_members",
+	"topic_groups",
+	"submissions",
 	"topic_members",
 	"topic_assistants",
-	"submissions",
 	"topics",
+	"class_members",
+	"classes",
 	"teacher_students",
 	"announcements",
 	"assignments",
 	"courses",
 	"enrollments",
-	"classes",
 	"users",
 }
 
-// dropLegacySchema 检测 v2 数据库并清理旧表；全新库 / 已是 v3 时不做任何事。
+// dropLegacySchema 检测旧库并清理旧表；全新库 / 已是 v4 时不做任何事。
+//
+//   - v2（班级 / 任务模型）：users 没有 login_id 列 → 丢旧表按 v4 重建；
+//   - v3（课题-提交-评价）：缺少 classes / topic_groups 或 topics.class_id、
+//     submissions.group_id 列 → 丢旧表按 v4 重建（v4 增加班级与分组，旧数据不保留）。
 func dropLegacySchema(db *sql.DB) error {
 	var tableCount int
 	if err := db.QueryRow(
@@ -129,17 +136,77 @@ func dropLegacySchema(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	if hasLoginID {
-		return nil
+	if !hasLoginID {
+		log.Printf("检测到 v2（班级 / 任务模型）数据库结构，按 v4 契约重建数据表（旧数据不会保留）")
+		return dropAllTables(db)
 	}
 
-	log.Printf("检测到 v2（班级 / 任务模型）数据库结构，按 v3 契约重建数据表（旧数据不会保留）")
+	isV4, err := isV4Schema(db)
+	if err != nil {
+		return err
+	}
+	if isV4 {
+		return nil
+	}
+	log.Printf("检测到 v3 数据库结构，按 v4 契约重建数据表（新增班级与分组，旧数据不会保留）")
+	return dropAllTables(db)
+}
+
+// isV4Schema 判断当前库是否已具备 v4 的表与列。
+func isV4Schema(db *sql.DB) (bool, error) {
+	checks := []struct {
+		table  string
+		column string
+	}{
+		{"classes", ""},
+		{"class_members", ""},
+		{"topic_groups", ""},
+		{"group_members", ""},
+		{"topics", "class_id"},
+		{"topics", "submit_mode"},
+		{"submissions", "group_id"},
+	}
+	for _, check := range checks {
+		exists, err := tableExists(db, check.table)
+		if err != nil {
+			return false, err
+		}
+		if !exists {
+			return false, nil
+		}
+		if check.column == "" {
+			continue
+		}
+		hasColumn, err := tableHasColumn(db, check.table, check.column)
+		if err != nil {
+			return false, err
+		}
+		if !hasColumn {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// dropAllTables 按子表在前的顺序删除全部业务表。
+func dropAllTables(db *sql.DB) error {
 	for _, table := range legacyTables {
 		if _, err := db.Exec("DROP TABLE IF EXISTS " + table); err != nil {
 			return fmt.Errorf("清理旧表 %s 失败: %w", table, err)
 		}
 	}
 	return nil
+}
+
+// tableExists 判断表是否存在。
+func tableExists(db *sql.DB, table string) (bool, error) {
+	var count int
+	if err := db.QueryRow(
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, table,
+	).Scan(&count); err != nil {
+		return false, fmt.Errorf("检查表 %s 是否存在失败: %w", table, err)
+	}
+	return count > 0, nil
 }
 
 // tableHasColumn 判断表是否存在指定列。

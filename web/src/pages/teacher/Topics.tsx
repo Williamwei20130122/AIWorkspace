@@ -370,6 +370,7 @@ export default function TeacherTopics() {
                   <thead className="border-b border-line bg-brand-50/60 text-xs text-ink-soft">
                     <tr>
                       <th scope="col" className="px-4 py-3 font-semibold">课题</th>
+                      <th scope="col" className="px-3 py-3 font-semibold">班级</th>
                       <th scope="col" className="px-3 py-3 font-semibold">状态</th>
                       <th scope="col" className="px-3 py-3 font-semibold">负责人</th>
                       <th scope="col" className="px-3 py-3 text-right font-semibold">成员</th>
@@ -392,6 +393,9 @@ export default function TeacherTopics() {
                           >
                             {topic.title}
                           </Link>
+                        </td>
+                        <td className="px-3 py-3 text-xs text-ink-soft">
+                          {topic.className || "—"}
                         </td>
                         <td className="px-3 py-3">
                           <TopicStatusBadge status={topic.status} />
@@ -524,7 +528,7 @@ export default function TeacherTopics() {
                   新建课题
                 </h2>
                 <p className="mt-1 text-xs leading-5 text-ink-soft">
-                  填写标题即可创建，介绍页、成员与评价维度稍后在详情页完善。
+                  选择班级、勾选参与学生（默认全选），介绍页、成员与评价维度稍后在详情页完善。
                 </p>
               </div>
               <button
@@ -574,6 +578,7 @@ function TopicMobileCard({ topic }: { topic: TopicSummary }) {
         >
           {topic.isOwner ? "我创建" : "助教"}
         </span>
+        {topic.className ? <span className="ml-2">班级 {topic.className}</span> : null}
       </p>
 
       <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">

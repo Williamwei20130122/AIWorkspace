@@ -164,3 +164,103 @@ evaluation_scores ( id TEXT PK, evaluation_id TEXT NOT NULL, dimension_id TEXT N
 ## 9. Docker
 
 同 v2 结构（Vite → Go → alpine），`go:embed` 前端；`/data` 卷同时放 `app.db` 与 `uploads/`；`DATABASE_PATH=/data/app.db`、`UPLOAD_DIR=/data/uploads`；`AUTH_SECRET` 必填（compose 从 `.env`）。
+
+---
+
+## 10. v4 变更（班级 + 分组）
+
+> v4 在 v3 基础上增加「班级」与「课题内分组」。以下为增量契约，未提及的部分沿用 v3。
+
+### 10.1 数据模型（新增/变更）
+
+```sql
+classes ( id TEXT PK, name TEXT NOT NULL, grade TEXT,
+  teacher_id TEXT NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL );
+class_members ( id TEXT PK, class_id TEXT NOT NULL, student_id TEXT NOT NULL,
+  joined_at TEXT NOT NULL, removed_at TEXT,
+  UNIQUE(class_id, student_id) );
+
+-- topics 增加列
+class_id TEXT REFERENCES classes(id),             -- 创建课题时选择班级
+submit_mode TEXT NOT NULL DEFAULT 'INDIVIDUAL',   -- INDIVIDUAL | GROUP
+group_min INTEGER NOT NULL DEFAULT 2,
+group_max INTEGER NOT NULL DEFAULT 4,
+allow_student_groups INTEGER NOT NULL DEFAULT 0;  -- 0/1
+
+topic_groups ( id TEXT PK, topic_id TEXT NOT NULL, name TEXT NOT NULL,
+  created_by TEXT NOT NULL,                       -- 'teacher' | 'student'
+  created_at TEXT NOT NULL );
+group_members ( group_id TEXT NOT NULL, student_id TEXT NOT NULL,
+  joined_at TEXT NOT NULL, PRIMARY KEY(group_id, student_id) );
+
+-- submissions 变更：小组提交时 group_id 非空、student_id 为空
+group_id TEXT REFERENCES topic_groups(id);
+-- student_id 改为可空
+-- 唯一索引：个人提交 UNIQUE(topic_id, student_id) WHERE group_id IS NULL；
+--           小组提交 UNIQUE(topic_id, group_id) WHERE group_id IS NOT NULL
+```
+
+- 同一学生在一个课题内**只能属于一个小组**（应用层校验）。
+- `topic_members` 保留：课题学生从**班级学生**中勾选，老师可增删；`removed_at` 保留历史。
+- 旧 v3 库启动时检测到缺 `classes` 表 → 重建 v4 表并重新种子（日志警告；旧数据不保留）。
+
+### 10.2 规则
+
+- **班级**：老师创建班级（名称/年级）；班级学生由老师从「我管理的学生」中添加/移出（保留历史）；一个班级属于创建老师。
+- **课题**：创建时必须选班级，并从该班级学生中勾选参与学生（初始 `topic_members`）；之后可增删（限班级学生内）。
+- **提交模式**（课题级）：`INDIVIDUAL` 每人一份；`GROUP` 小组共享一份提交与附件，评价针对小组、组员都能看到。
+- **分组人数**：`group_min`/`group_max` 课题级配置；加入/创建组不得超过 `group_max`；小组提交要求所在组人数 ≥ `group_min`，否则 400 提示。
+- **分组方式**：老师可手动建组/加人/移出/删组，也可一键**随机分组**（把未分组学生尽量均匀分配）；`allow_student_groups=1` 时学生可自行创建/加入/退出小组（创建者自动入组，创建者标记为 `student`）。
+- **已评价锁定**：小组提交被评价后，该组不能重新提交；个人提交同理。
+
+### 10.3 API（增量）
+
+教师：
+- `GET /api/teacher/classes` → `[{id,name,grade,memberCount,topicCount,createdAt}]`
+- `POST /api/teacher/classes {name,grade?}` → 201 `{id}`
+- `GET /api/teacher/classes/{id}` → `{id,name,grade,students:[{id,name,loginId,removedAt}],topics:[{id,title,status}]}`
+- `PATCH /api/teacher/classes/{id} {name?,grade?}` → 200
+- `POST /api/teacher/classes/{id}/students {loginId}` → 201（只能添加自己管理的学生）
+- `DELETE /api/teacher/classes/{id}/students/{studentId}` → 204（置 removed_at）
+- `POST /api/teacher/topics` 增加 `classId`，可选 `studentIds: string[]`（从班级学生勾选，缺省=班级全部有效学生）
+- `GET /api/teacher/topics` 每项增加 `className`
+- `GET /api/teacher/topics/{id}` 增加 `class:{id,name}`、`submitMode`、`groupMin`、`groupMax`、`allowStudentGroups`、`groups:[{id,name,createdBy,members:[{id,name,loginId}]}]`
+- `PATCH /api/teacher/topics/{id}` 增加 `submitMode?`、`groupMin?`、`groupMax?`、`allowStudentGroups?`（校验 min≤max、1..50）
+- `POST /api/teacher/topics/{id}/groups {name?}` → 201 `{id}`
+- `PATCH /api/teacher/topics/{id}/groups/{groupId} {name}` → 200
+- `DELETE /api/teacher/topics/{id}/groups/{groupId}` → 204（组内提交存在则 400）
+- `POST /api/teacher/topics/{id}/groups/{groupId}/members {studentId}` → 201（学生必须在课题、未组、组未满）
+- `DELETE /api/teacher/topics/{id}/groups/{groupId}/members/{studentId}` → 204
+- `POST /api/teacher/topics/{id}/groups/random {groupCount?}` → 200 `{groups}`（未分组学生随机分配；尽量均匀，不超过 max）
+- `GET /api/teacher/topics/{id}/submissions` 增加 `group:{id,name}|null`、`submitter` 字段
+
+学生：
+- `GET /api/student/classes` → `[{id,name,grade,teacher:{name},memberCount}]`
+- `GET /api/student/topics/{id}` 增加 `class:{id,name}`、`submitMode`、`groupMin/groupMax`、`allowStudentGroups`、`myGroup:{id,name,members:[{id,name}]}|null`、`groups:[{id,name,memberCount,members?}]`（allowStudentGroups 时才给全部组）
+- `POST /api/student/topics/{id}/groups {name?}` → 201（allowStudentGroups=1；自动入组；组满/已有组 400）
+- `POST /api/student/topics/{id}/groups/{groupId}/join` → 200（组未满、未入组）
+- `POST /api/student/topics/{id}/groups/leave` → 200（退出当前组）
+- `POST /api/student/topics/{id}/submission`：按 submitMode 决定；
+  - GROUP：必须已有小组且 `len(members) >= group_min`，否则 400；提交归属 group_id；组成员共享查看；已评价 400
+  - INDIVIDUAL：同 v3
+- `GET /api/student/topics/{id}` 的 `mySubmission` 逻辑：GROUP 模式返回小组提交，否则个人提交。
+
+### 10.4 页面（增量）
+
+教师：
+- 导航 + `/teacher/classes`：班级表格（名称/年级/学生数/课题数/创建时间）+ 新建班级抽屉；班级详情 `/teacher/classes/:id`：学生名单（添加/移出）、该班课题列表、去建课题
+- 新建课题：选班级 → 勾选学生（默认全选）→ 创建
+- 课题详情增加：班级信息、提交模式切换（个人/小组）、分组人数上下限、允许学生自组开关、分组管理区（组卡片：组名/人数/成员；建组、加人、移出、删组、随机分组按钮；未分组学生列表）
+
+学生：
+- 导航 + `/student/classes`：我的班级（班级名、老师、人数、课题数）
+- 课题详情增加：班级信息、分组区（我的小组/组员；allowStudentGroups 时：创建小组、加入未满小组、退出小组、未分组提示）；GROUP 模式显示「以小组身份提交」，提交/评价组员共享
+
+### 10.5 种子（v4）
+
+- 班级：初二（3）班（老师 teacher@demo.edu，学生 S001–S004）、数学兴趣小组（S001/S002）
+- 课题 1「校园气象站数据记录」：班级=初二（3）班，GROUP 模式，group_min=2/max=4，allow_student_groups=1，学生 S001/S002/S003，分组 2 组（S001+S003、S002）；小组提交 1 份 + 评价
+- 课题 2「班级图书角运营方案」：INDIVIDUAL，学生 S001/S002/S004，无提交
+- 课题 3「校园植物观察（已结题）」：CLOSED，S002 历史成员
+- 演示账号不变

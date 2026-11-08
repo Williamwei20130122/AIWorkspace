@@ -181,6 +181,15 @@ export function IconAward({ className }: IconProps) {
   );
 }
 
+export function IconSchool({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M3 21V9l9-5 9 5v12" />
+      <path d="M9 21v-6h6v6M3 21h18" />
+    </Svg>
+  );
+}
+
 export function IconSearch({ className }: IconProps) {
   return (
     <Svg className={className}>

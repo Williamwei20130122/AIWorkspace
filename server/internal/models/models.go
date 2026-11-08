@@ -31,6 +31,94 @@ type ManagedStudent struct {
 	CreatedAt   string `json:"createdAt"`
 }
 
+/* ------------------------------------------------------------------ */
+/* 班级（v4）                                                          */
+/* ------------------------------------------------------------------ */
+
+// TeacherClass GET /api/teacher/classes 列表项。
+type TeacherClass struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Grade       *string `json:"grade"`
+	MemberCount int     `json:"memberCount"`
+	TopicCount  int     `json:"topicCount"`
+	CreatedAt   string  `json:"createdAt"`
+}
+
+// ClassStudent 班级学生（removedAt 非空表示已移出但保留历史）。
+type ClassStudent struct {
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	LoginID   string  `json:"loginId"`
+	RemovedAt *string `json:"removedAt"`
+}
+
+// ClassTopic 班级详情里的课题概要。
+type ClassTopic struct {
+	ID     string `json:"id"`
+	Title  string `json:"title"`
+	Status string `json:"status"`
+}
+
+// TeacherClassDetail GET /api/teacher/classes/{id} 响应。
+type TeacherClassDetail struct {
+	ID       string         `json:"id"`
+	Name     string         `json:"name"`
+	Grade    *string        `json:"grade"`
+	Students []ClassStudent `json:"students"`
+	Topics   []ClassTopic   `json:"topics"`
+}
+
+// StudentClass GET /api/student/classes 列表项。
+type StudentClass struct {
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Grade       *string  `json:"grade"`
+	Teacher     NameOnly `json:"teacher"`
+	MemberCount int      `json:"memberCount"`
+	TopicCount  int      `json:"topicCount"`
+}
+
+/* ------------------------------------------------------------------ */
+/* 分组（v4）                                                          */
+/* ------------------------------------------------------------------ */
+
+// GroupMember 小组成员（教师侧）。
+type GroupMember struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	LoginID string `json:"loginId"`
+}
+
+// TopicGroup 课题小组（教师侧详情）。
+type TopicGroup struct {
+	ID        string        `json:"id"`
+	Name      string        `json:"name"`
+	CreatedBy string        `json:"createdBy"`
+	Members   []GroupMember `json:"members"`
+}
+
+// GroupMemberName 小组成员（学生侧，只含 id / name）。
+type GroupMemberName struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// MyGroup 学生当前所在小组。
+type MyGroup struct {
+	ID      string            `json:"id"`
+	Name    string            `json:"name"`
+	Members []GroupMemberName `json:"members"`
+}
+
+// StudentGroup 学生端可见的小组（allowStudentGroups=1 时给全部组）。
+type StudentGroup struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	MemberCount int               `json:"memberCount"`
+	Members     []GroupMemberName `json:"members"`
+}
+
 // IDName 只含 id + name 的简要对象。
 type IDName struct {
 	ID   string `json:"id"`
@@ -107,6 +195,7 @@ type TeacherTopic struct {
 	Title           string `json:"title"`
 	Status          string `json:"status"`
 	JoinMode        string `json:"joinMode"`
+	ClassName       string `json:"className"`
 	Owner           IDName `json:"owner"`
 	IsOwner         bool   `json:"isOwner"`
 	MemberCount     int    `json:"memberCount"`
@@ -133,16 +222,22 @@ type TopicStats struct {
 
 // TeacherTopicDetail GET /api/teacher/topics/{id} 响应。
 type TeacherTopicDetail struct {
-	ID            string                   `json:"id"`
-	Title         string                   `json:"title"`
-	DescriptionMD string                   `json:"descriptionMd"`
-	Status        string                   `json:"status"`
-	JoinMode      string                   `json:"joinMode"`
-	Owner         IDName                   `json:"owner"`
-	Assistants    []TopicAssistant         `json:"assistants"`
-	Students      []TopicStudent           `json:"students"`
-	Dimensions    []Dimension              `json:"dimensions"`
-	Submissions   []TeacherTopicSubmission `json:"submissions"`
+	ID                 string                   `json:"id"`
+	Title              string                   `json:"title"`
+	DescriptionMD      string                   `json:"descriptionMd"`
+	Status             string                   `json:"status"`
+	JoinMode           string                   `json:"joinMode"`
+	Owner              IDName                   `json:"owner"`
+	Class              *IDName                  `json:"class"`
+	SubmitMode         string                   `json:"submitMode"`
+	GroupMin           int                      `json:"groupMin"`
+	GroupMax           int                      `json:"groupMax"`
+	AllowStudentGroups bool                     `json:"allowStudentGroups"`
+	Assistants         []TopicAssistant         `json:"assistants"`
+	Students           []TopicStudent           `json:"students"`
+	Dimensions         []Dimension              `json:"dimensions"`
+	Groups             []TopicGroup             `json:"groups"`
+	Submissions        []TeacherTopicSubmission `json:"submissions"`
 }
 
 // TopicAssistant 课题助教。
@@ -177,9 +272,12 @@ type StudentBrief struct {
 }
 
 // TeacherTopicSubmission 课题详情里的提交列表项。
+// 个人提交 student 非空、group 为空；小组提交 group 非空，student 记录实际提交人。
 type TeacherTopicSubmission struct {
 	ID               string             `json:"id"`
-	Student          StudentBrief       `json:"student"`
+	Student          *StudentBrief      `json:"student"`
+	Submitter        *StudentBrief      `json:"submitter"`
+	Group            *IDName            `json:"group"`
 	TextContent      string             `json:"textContent"`
 	UpdatedAt        string             `json:"updatedAt"`
 	FileCount        int                `json:"fileCount"`
@@ -207,7 +305,9 @@ type ScoreDetail struct {
 type TeacherSubmissionDetail struct {
 	ID          string              `json:"id"`
 	Topic       IDName              `json:"topic"`
-	Student     StudentBrief        `json:"student"`
+	Student     *StudentBrief       `json:"student"`
+	Submitter   *StudentBrief       `json:"submitter"`
+	Group       *IDName             `json:"group"`
 	TextContent string              `json:"textContent"`
 	Files       []SubmissionFile    `json:"files"`
 	UpdatedAt   string              `json:"updatedAt"`
@@ -239,6 +339,7 @@ type EvaluationListItem struct {
 	Teacher      IDName       `json:"teacher"`
 	Student      IDName       `json:"student"`
 	Topic        IDName       `json:"topic"`
+	Group        *IDName      `json:"group"`
 	SubmissionID string       `json:"submissionId"`
 	Scores       []ScoreBrief `json:"scores"`
 }
@@ -270,6 +371,7 @@ type StudentOverviewTopic struct {
 	Title           string   `json:"title"`
 	Status          string   `json:"status"`
 	Owner           NameOnly `json:"owner"`
+	SubmissionMode  string   `json:"submitMode"`
 	EvaluationCount int      `json:"evaluationCount"`
 	Submitted       bool     `json:"submitted"`
 	UpdatedAt       string   `json:"updatedAt"`
@@ -287,25 +389,33 @@ type StudentEvaluationItem struct {
 
 // StudentTopic GET /api/student/topics 列表项（含历史课题）。
 type StudentTopic struct {
-	ID        string   `json:"id"`
-	Title     string   `json:"title"`
-	Status    string   `json:"status"`
-	Owner     NameOnly `json:"owner"`
-	Submitted bool     `json:"submitted"`
-	UpdatedAt string   `json:"updatedAt"`
-	RemovedAt *string  `json:"removedAt"`
+	ID         string   `json:"id"`
+	Title      string   `json:"title"`
+	Status     string   `json:"status"`
+	Owner      NameOnly `json:"owner"`
+	Submitted  bool     `json:"submitted"`
+	SubmitMode string   `json:"submitMode"`
+	UpdatedAt  string   `json:"updatedAt"`
+	RemovedAt  *string  `json:"removedAt"`
 }
 
 // StudentTopicDetail GET /api/student/topics/{id} 响应。
 type StudentTopicDetail struct {
-	ID            string                   `json:"id"`
-	Title         string                   `json:"title"`
-	DescriptionMD string                   `json:"descriptionMd"`
-	Status        string                   `json:"status"`
-	Owner         NameOnly                 `json:"owner"`
-	Assistants    []NameOnly               `json:"assistants"`
-	MySubmission  *StudentSubmission       `json:"mySubmission"`
-	MyEvaluations []StudentEvaluationBrief `json:"myEvaluations"`
+	ID                 string                   `json:"id"`
+	Title              string                   `json:"title"`
+	DescriptionMD      string                   `json:"descriptionMd"`
+	Status             string                   `json:"status"`
+	Owner              NameOnly                 `json:"owner"`
+	Class              *IDName                  `json:"class"`
+	SubmitMode         string                   `json:"submitMode"`
+	GroupMin           int                      `json:"groupMin"`
+	GroupMax           int                      `json:"groupMax"`
+	AllowStudentGroups bool                     `json:"allowStudentGroups"`
+	Assistants         []NameOnly               `json:"assistants"`
+	MyGroup            *MyGroup                 `json:"myGroup"`
+	Groups             []StudentGroup           `json:"groups"`
+	MySubmission       *StudentSubmission       `json:"mySubmission"`
+	MyEvaluations      []StudentEvaluationBrief `json:"myEvaluations"`
 }
 
 // StudentSubmission 学生自己的提交。

@@ -23,12 +23,17 @@ export function SubmitForm({
   topicId,
   closed,
   evaluated,
+  blockedReason,
+  groupMode = false,
   submission,
   onSubmitted,
 }: {
   topicId: string;
   closed: boolean;
   evaluated: boolean;
+  /** GROUP 模式下未分组/人数不足等提交前置条件未满足时的提示 */
+  blockedReason?: string | null;
+  groupMode?: boolean;
   submission: MySubmission;
   onSubmitted?: () => void;
 }) {
@@ -102,9 +107,13 @@ export function SubmitForm({
       await api.upload<{ ok: boolean }>(`/api/student/topics/${topicId}/submission`, formData);
 
       setSuccess(
-        submission
-          ? "重新提交成功：文本与附件已覆盖，老师会看到最新内容。"
-          : "提交成功，老师评价后会显示在这里。",
+        groupMode
+          ? submission
+            ? "小组重新提交成功：文本与附件已覆盖，组员都会看到最新内容。"
+            : "小组提交成功，组员都能看到本次提交。"
+          : submission
+            ? "重新提交成功：文本与附件已覆盖，老师会看到最新内容。"
+            : "提交成功，老师评价后会显示在这里。",
       );
       setFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -132,11 +141,21 @@ export function SubmitForm({
     );
   }
 
+  if (blockedReason) {
+    return (
+      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm leading-relaxed text-amber-800">
+        {blockedReason}
+      </p>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {submission ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
-          你已提交过。重新提交会覆盖当前的文本内容与全部附件（原附件不会保留，请重新选择需要保留的文件）。
+          {groupMode
+            ? "你所在小组已提交过。重新提交会覆盖小组当前的文本内容与全部附件（组员都会看到最新内容）。"
+            : "你已提交过。重新提交会覆盖当前的文本内容与全部附件（原附件不会保留，请重新选择需要保留的文件）。"}
         </p>
       ) : null}
 
@@ -210,7 +229,9 @@ export function SubmitForm({
         {pending ? "提交中…" : submission ? "重新提交" : "提交"}
       </Button>
       <p className="text-xs leading-relaxed text-ink-soft">
-        提交后仍可随时重新提交，老师会看到最新一次提交。
+        {groupMode
+          ? "本次提交归你所在的小组所有，组员都能查看并重新提交。"
+          : "提交后仍可随时重新提交，老师会看到最新一次提交。"}
       </p>
     </form>
   );

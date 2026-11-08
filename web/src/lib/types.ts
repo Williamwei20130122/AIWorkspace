@@ -25,6 +25,7 @@ export interface TopicSummary {
   title: string;
   status: TopicStatus;
   joinMode: string;
+  className?: string;
   owner: { id: string; name: string };
   isOwner: boolean;
   memberCount: number;
@@ -92,6 +93,8 @@ export interface SubmissionFile {
 export interface SubmissionSummary {
   id: string;
   student: { id: string; name: string; loginId: string };
+  group?: { id: string; name: string } | null;
+  submitter?: { id: string; name: string; loginId: string } | null;
   textContent: string;
   updatedAt: string;
   fileCount: number;
@@ -106,10 +109,16 @@ export interface TopicDetail {
   descriptionMd: string;
   status: TopicStatus;
   joinMode: string;
+  class: { id: string; name: string } | null;
+  submitMode: SubmitMode;
+  groupMin: number;
+  groupMax: number;
+  allowStudentGroups: boolean;
   owner: { id: string; name: string };
   assistants: TopicAssistant[];
   students: TopicStudent[];
   dimensions: Dimension[];
+  groups: TopicGroup[];
   submissions: SubmissionSummary[];
 }
 
@@ -185,6 +194,13 @@ export interface StudentTopicDetail {
   status: TopicStatus;
   owner: { name: string };
   assistants: { name: string }[];
+  class: { id: string; name: string } | null;
+  submitMode: SubmitMode;
+  groupMin: number;
+  groupMax: number;
+  allowStudentGroups: boolean;
+  myGroup: MyGroup | null;
+  groups: StudentGroupSummary[];
   mySubmission: {
     id: string;
     textContent: string;
@@ -193,3 +209,61 @@ export interface StudentTopicDetail {
   } | null;
   myEvaluations: Evaluation[];
 }
+
+/** 学生端看到的小组概要（allowStudentGroups 时给全部组） */
+export interface StudentGroupSummary {
+  id: string;
+  name: string;
+  memberCount: number;
+  members?: { id: string; name: string }[];
+}
+
+// ---------------- v4：班级与分组 ----------------
+
+export interface TeacherClass {
+  id: string;
+  name: string;
+  grade: string | null;
+  memberCount: number;
+  topicCount: number;
+  createdAt: string;
+}
+
+export interface ClassStudent {
+  id: string;
+  name: string;
+  loginId: string;
+  removedAt: string | null;
+}
+
+export interface ClassDetail {
+  id: string;
+  name: string;
+  grade: string | null;
+  students: ClassStudent[];
+  topics: { id: string; title: string; status: TopicStatus }[];
+}
+
+export interface StudentClass {
+  id: string;
+  name: string;
+  grade: string | null;
+  teacher: { name: string };
+  memberCount: number;
+  topicCount?: number;
+}
+
+export interface TopicGroup {
+  id: string;
+  name: string;
+  createdBy: "teacher" | "student";
+  members: { id: string; name: string; loginId: string }[];
+}
+
+export interface MyGroup {
+  id: string;
+  name: string;
+  members: { id: string; name: string }[];
+}
+
+export type SubmitMode = "INDIVIDUAL" | "GROUP";

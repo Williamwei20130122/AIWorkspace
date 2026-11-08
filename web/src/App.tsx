@@ -5,11 +5,14 @@ import { roleHome } from "@/lib/format";
 import LoginPage from "@/pages/Login";
 import RegisterPage from "@/pages/Register";
 import TeacherDashboard from "@/pages/teacher/Dashboard";
+import TeacherClasses from "@/pages/teacher/Classes";
+import TeacherClassDetail from "@/pages/teacher/ClassDetail";
 import TeacherTopics from "@/pages/teacher/Topics";
 import TeacherTopicDetail from "@/pages/teacher/TopicDetail";
 import TeacherStudents from "@/pages/teacher/Students";
 import TeacherEvaluations from "@/pages/teacher/Evaluations";
 import StudentDashboard from "@/pages/student/Dashboard";
+import StudentClasses from "@/pages/student/Classes";
 import StudentTopics from "@/pages/student/Topics";
 import StudentTopicDetail from "@/pages/student/TopicDetail";
 import StudentEvaluations from "@/pages/student/Evaluations";
@@ -72,6 +75,22 @@ export default function App() {
         }
       />
       <Route
+        path="/teacher/classes"
+        element={
+          <ProtectedRoute role="TEACHER">
+            <TeacherClasses />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/teacher/classes/:id"
+        element={
+          <ProtectedRoute role="TEACHER">
+            <TeacherClassDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/teacher/students"
         element={
           <ProtectedRoute role="TEACHER">
@@ -93,6 +112,14 @@ export default function App() {
         element={
           <ProtectedRoute role="STUDENT">
             <StudentDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student/classes"
+        element={
+          <ProtectedRoute role="STUDENT">
+            <StudentClasses />
           </ProtectedRoute>
         }
       />

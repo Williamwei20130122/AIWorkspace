@@ -11,6 +11,7 @@ import {
   IconGraduation,
   IconLogout,
   IconMenu,
+  IconSchool,
   IconUsers,
 } from "@/components/ui/icons";
 import { cn, roleHome } from "@/lib/format";
@@ -28,6 +29,7 @@ function navForRole(role: string): NavItem[] {
   if (role === "TEACHER" || role === "ADMIN") {
     return [
       { href: "/teacher", label: "工作台", icon: <IconDashboard />, exact: true },
+      { href: "/teacher/classes", label: "班级管理", icon: <IconSchool /> },
       { href: "/teacher/topics", label: "我的课题", icon: <IconBook /> },
       { href: "/teacher/students", label: "学生管理", icon: <IconUsers /> },
       { href: "/teacher/evaluations", label: "评价汇总", icon: <IconAward /> },
@@ -35,6 +37,7 @@ function navForRole(role: string): NavItem[] {
   }
   return [
     { href: "/student", label: "工作台", icon: <IconDashboard />, exact: true },
+    { href: "/student/classes", label: "我的班级", icon: <IconSchool /> },
     { href: "/student/topics", label: "我的课题", icon: <IconBook /> },
     { href: "/student/evaluations", label: "我的评价", icon: <IconAward /> },
   ];

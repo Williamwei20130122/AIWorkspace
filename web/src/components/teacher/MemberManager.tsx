@@ -279,7 +279,7 @@ export function MemberManager({
           <Field
             label="添加学生"
             htmlFor="new-member-login"
-            hint="输入学生学号；已移出的学生会自动恢复"
+            hint="输入学生学号；只能添加本班学生，已移出的学生会自动恢复"
           >
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
