@@ -1,0 +1,17 @@
+This project is a modified derivative work based on New‑API.
+
+Upstream Original Project: https://github.com/QuantumNous/new-api
+Upstream Copyright (C) 2024 QuantumNous
+Upstream License: GNU AGPL‑3.0
+
+=== Modification Summary ===
+1. A large number of original business features and modules have been removed.
+2. Multiple custom‑extended APIs and business logic have been added.
+3. Part of the underlying shared base code from upstream is retained.
+
+=== Copyright Information ===
+Original Copyright (C) 2024 QuantumNous
+Modifications Copyright (C) 2026 <Replace‑With‑Your‑Name‑Or‑GitHub‑ID>
+
+This derivative work as a whole is licensed under the GNU AGPL‑3.0.
+If you deploy this project as a public‑facing network API service, you must make the complete corresponding source code available to all end‑users.
