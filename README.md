@@ -1,10 +1,11 @@
-# AIWorkspace · 教学系统
+# AIWorkspace · 教学系统（Go 后端 + TS 前端）
 
 面向学校 **教师** 与 **学生** 的轻量网页教学系统：班级与成员、课程、作业发布与提交、批改与成绩、班级公告。
 
-项目基底已完成 Docker 封装，**宿主机 3100 端口** 即可访问；数据用 SQLite 持久化在容器卷里，适合校内单机部署或演示。
+技术栈：**Go 1.27**（标准库 HTTP + 纯 Go SQLite）+ **React 19 / Vite / TypeScript / Tailwind CSS v4**；单容器 Docker 部署，宿主机 **3100 端口** 访问。
 
-> 本仓库是项目底座（可直接运行的最小可用版本）。Git 远端：`https://github.com/Williamwei20130122/AIWorkspace`。
+> Git 远端：`https://github.com/Williamwei20130122/AIWorkspace`
+> Next.js 全栈版基底保留在 `feat/project-base` 分支（v1），当前主线为 `feat/go-ts`。
 
 ---
 
@@ -41,178 +42,138 @@
 | --- | --- | --- |
 | ![登录页](docs/screenshots/01-login.png) | ![教师工作台](docs/screenshots/02-teacher-dashboard.png) | ![学生成绩单](docs/screenshots/10-student-grades.png) |
 
-更多页面截图在 [`docs/screenshots/`](docs/screenshots/)（教师班级/作业批改、学生作业提交等）。
-截图由 `node scripts/capture-screenshots.mjs` 用本机无头 Edge/Chrome 自动生成。
+更多截图在 [`docs/screenshots/`](docs/screenshots/)，由 `node scripts/capture-screenshots.mjs` 自动生成。
 
 ---
 
-## 2. 技术栈
+## 2. 技术栈与结构
 
 | 层 | 选型 |
 | --- | --- |
-| 框架 | Next.js 15（App Router / Server Components / Server Actions） |
-| 语言 | TypeScript 5（strict） |
-| 样式 | Tailwind CSS v4（CSS-first，`src/app/globals.css`） |
-| 数据 | Prisma 6 + SQLite |
-| 校验 | zod 3 |
-| 部署 | Docker 多阶段构建（standalone 产物），宿主端口 **3100** |
-
----
-
-## 3. 目录结构
+| 后端 | Go 1.27，`net/http` 路由；`modernc.org/sqlite`（纯 Go，无需 CGO） |
+| 前端 | React 19 + Vite + TypeScript strict + Tailwind CSS v4 + React Router 7 |
+| 认证 | scrypt 口令哈希 + HMAC-SHA256 签名 HttpOnly Cookie（`aw_session`） |
+| 数据 | SQLite 文件：本地 `server/data/app.db`，容器 `/data/app.db`；启动自动建表 |
+| 部署 | Docker 多阶段：Vite 构建 → Go 构建（`go:embed` 内嵌前端）→ alpine |
 
 ```
-.
-├── src/
-│   ├── app/                 # 路由（App Router）
-│   │   ├── actions/         # Server Actions（auth / teacher / student）
-│   │   ├── api/health/      # 健康检查（Docker healthcheck）
-│   │   ├── login/           # 登录页
-│   │   ├── teacher/         # 教师端页面
-│   │   └── student/         # 学生端页面
-│   ├── components/
-│   │   ├── ui/              # 通用展示组件
-│   │   ├── shell/           # 侧栏框架
-│   │   ├── auth/            # 登录表单
-│   │   ├── teacher/         # 教师端交互组件
-│   │   └── student/         # 学生端交互组件
-│   └── lib/                 # prisma / auth / data / format / roles
-├── prisma/
-│   ├── schema.prisma        # 数据模型
-│   ├── migrations/          # 迁移
-│   ├── seed.mjs             # 演示数据
-│   └── ensure-seed.mjs      # 容器启动时空库自动灌数据
-├── docs/                    # 需求、架构、设计系统、开发契约
-├── docker/entrypoint.sh     # 容器入口（迁移 → 种子 → 启动）
-├── Dockerfile
-├── docker-compose.yml
-└── package.json
+server/                    Go 后端
+  cmd/server/main.go       入口（环境变量、建库、种子、HTTP 服务、内嵌前端）
+  internal/db/             schema.sql、建库、种子
+  internal/auth/           scrypt、会话签名、鉴权中间件
+  internal/handlers/       auth / teacher / student / health
+  internal/models/         JSON 结构体
+  webdist/                 go:embed 的前端产物（构建时由 web/dist 覆盖）
+web/                       Vite + React 前端
+  src/pages/               页面（teacher/、student/、Login）
+  src/components/          ui、shell、auth、teacher、student
+  src/lib/                 api、types、format、roles
+docs/                      需求、架构、设计系统、开发契约、截图
+scripts/                   截图等开发脚本
+Dockerfile / docker-compose.yml
 ```
 
 ---
 
-## 4. 本地开发（不需要 Docker）
+## 3. 本地开发
 
-环境要求：Node.js **>= 20.9**（推荐 22）、npm 10+。
+环境要求：**Go 1.27+**、**Node.js 22+**、npm 10+。
+
+### 后端（:3100）
 
 ```bash
-# 1. 安装依赖
+cd server
+# 首次需要设置环境变量（PowerShell 示例；bash 用 export）
+$env:AUTH_SECRET="dev-secret-change-me"
+$env:DATABASE_PATH="./data/app.db"
+$env:SEED_ON_START="1"
+go run ./cmd/server
+```
+
+健康检查：`http://localhost:3100/api/health`。
+
+### 前端（:5173，自动代理 /api 到 :3100）
+
+```bash
+cd web
 npm install
-
-# 2. 配置环境变量
-cp .env.example .env
-#   Windows PowerShell: Copy-Item .env.example .env
-#   把 AUTH_SECRET 换成随机长字符串：
-#   node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
-
-# 3. 建库 + 迁移 + 演示数据
-npm run db:migrate
-npm run db:seed
-
-# 4. 启动（开发模式，热更新）
 npm run dev
 ```
 
-打开 http://localhost:3100 ，用上面的演示账号登录。
+打开 http://localhost:5173 ，用演示账号登录。
 
-### 常用脚本
+### 生产构建（单端口 3100）
 
-| 命令 | 说明 |
-| --- | --- |
-| `npm run dev` | 开发服务器，端口 3100 |
-| `npm run build` | 生成 Prisma Client + 生产构建 |
-| `npm run start` | 以生产模式启动（需先 build） |
-| `npm run typecheck` | TypeScript 全量检查 |
-| `npm run db:migrate` | 创建/应用迁移（开发） |
-| `npm run db:deploy` | 应用已有迁移（生产） |
-| `npm run db:seed` | 重置并写入演示数据（会清空现有数据！） |
-| `npm run db:studio` | Prisma Studio 可视化管理数据 |
+```bash
+cd web && npm ci && npm run build
+cd ../server && go build -o ../aiworkspace ./cmd/server
+# 把 web/dist 放进 server/webdist 再编译（go:embed 需要）
+```
+
+> 也可以直接 `docker compose up -d --build`，Dockerfile 会自动完成前后端构建与内嵌。
 
 ---
 
-## 5. Docker 部署（3100 端口）
+## 4. Docker 部署（3100 端口）
 
 ```bash
-# 1. 准备环境变量
-cp .env.example .env
-#   修改 .env 里的 AUTH_SECRET 为随机值（compose 会自动读取 .env）
-
-# 2. 构建并启动
+cp .env.example .env     # 修改 AUTH_SECRET 为随机值
 docker compose up -d --build
-
-# 3. 查看状态与日志
-docker compose ps
 docker compose logs -f web
-
-# 4. 访问
-#    http://localhost:3100
-#    健康检查：http://localhost:3100/api/health
+# 打开 http://localhost:3100
 ```
 
-- 端口映射：`3100:3100`（容器内 Next.js 也监听 3100，可用 `PORT` 覆盖）。
-- 数据持久化：命名卷 `aiworkspace-data` → 容器内 `/data/app.db`；`docker compose down` 不会丢数据，`down -v` 会删卷。
-- 首次启动（空库）会执行 `prisma migrate deploy` 并自动写入演示数据；要关闭演示数据：`SEED_ON_START=0 docker compose up -d`。
-- 重置数据：`docker compose down -v && docker compose up -d --build`。
+- 端口映射 `3100:3100`（容器内 Go 服务监听 3100）。
+- 数据持久化：命名卷 `aiworkspace-data` → `/data/app.db`；`down` 不丢数据，`down -v` 重置。
+- 空库首次启动自动写演示数据；`SEED_ON_START=0` 关闭。
+- 健康检查：容器内 `wget http://127.0.0.1:3100/api/health`。
 
-### 构建参数（网络环境相关）
+### 构建参数（网络环境）
 
-默认已针对国内网络做了处理，一般直接 `docker compose up -d --build` 即可：
-
-| 参数 / 变量 | 默认 | 说明 |
+| 参数 | 默认 | 说明 |
 | --- | --- | --- |
-| `BASE_IMAGE` | `docker.m.daocloud.io/library/node:22-alpine` | 基础镜像走国内镜像源；能直连 Docker Hub 时用 `--build-arg BASE_IMAGE=node:22-alpine` 覆盖 |
-| `NPM_REGISTRY` | `https://registry.npmjs.org` | 构建时 npm 源；国内可 `--build-arg NPM_REGISTRY=https://registry.npmmirror.com` |
-| `PRISMA_ENGINES_MIRROR` | `https://registry.npmmirror.com/-/binary/prisma` | Prisma 引擎下载镜像（Dockerfile 内已设置） |
-
-> 镜像内以非 root 用户 `nextjs` 运行；Prisma CLI 单独安装在 `/app/prisma-cli`，启动时只做 `migrate deploy`，不把开发依赖带进运行镜像。
-
-### 不用 compose，直接 docker run
-
-```bash
-docker build -t aiworkspace:latest .
-docker run -d --name aiworkspace-web -p 3100:3100 \
-  -v aiworkspace-data:/data \
-  -e AUTH_SECRET="$(node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))")" \
-  aiworkspace:latest
-```
+| `BASE_NODE` | `docker.m.daocloud.io/library/node:22-alpine` | 前端构建镜像 |
+| `BASE_GO` | `docker.m.daocloud.io/library/golang:1.27-alpine` | Go 构建镜像 |
+| `BASE_RUN` | `docker.m.daocloud.io/library/alpine:3.22` | 运行镜像 |
+| `NPM_REGISTRY` | `https://registry.npmjs.org` | compose 已覆盖为 npmmirror |
+| `GOPROXY` | `https://goproxy.cn,direct` | compose 已覆盖为国内代理 |
 
 ---
 
-## 6. 环境变量
+## 5. 环境变量
 
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
-| `DATABASE_URL` | `file:./dev.db`（本地）/ `file:/data/app.db`（容器） | SQLite 文件路径 |
-| `AUTH_SECRET` | 无（生产必须配置） | 会话 Cookie 签名密钥，泄露=可伪造登录 |
+| `AUTH_SECRET` | 无（生产必须配置） | 会话 Cookie 签名密钥 |
 | `PORT` | `3100` | 监听端口 |
-| `SEED_ON_START` | `1` | 容器空库时是否写入演示数据 |
+| `DATABASE_PATH` | `./data/app.db`（本地）/ `/data/app.db`（容器） | SQLite 文件路径 |
+| `SEED_ON_START` | `1` | 空库时是否写演示数据 |
 
 ---
 
-## 7. 协作约定（Git）
+## 6. 协作约定（Git）
 
-- 主分支：`main`（受保护，合并走 PR）
-- 功能开发：`feat/<模块>`、修复：`fix/<问题>`；提交信息用中文或英文均可，建议 `feat: 教师端作业批改` 格式
-- 提交前自查：`npm run typecheck && npm run build`
-- 数据模型变更必须提交新的 Prisma migration（`npm run db:migrate` 生成，随代码一起提交）
-- 关键接口变化同步更新 [`docs/CONTRACT.md`](docs/CONTRACT.md)
+- 主分支：`main`；功能分支：`feat/<模块>`、修复：`fix/<问题>`
+- 提交前：`cd web && npm run build`；`cd server && go vet ./... && go build ./...`
+- 接口/数据模型变更必须同步更新 [`docs/CONTRACT.md`](docs/CONTRACT.md)
+- 交付流程：分支 → PR（`gh pr create --draft`）→ 评审合并
 
 ---
 
-## 8. 后续可迭代
+## 7. 后续可迭代
 
 - 学生作业附件上传（图片/PDF）
 - 通知与提醒（站内信 / 邮件）
-- 多班级、多学校与管理员后台
+- 多学校与管理员后台
 - 成绩统计图表、导出 Excel/PDF
-- 迁移到 PostgreSQL（Prisma 改 datasource 即可）
-- 单元测试（Playwright E2E / Vitest）与 CI
+- 迁移 PostgreSQL
+- 自动化测试（Playwright E2E / Go httptest）与 CI
 
 ---
 
-## 9. 文档
+## 8. 文档
 
-- [`docs/requirements.md`](docs/requirements.md) —— 需求范围与验收标准
-- [`docs/architecture.md`](docs/architecture.md) —— 架构、请求流程、数据模型
-- [`docs/design-system.md`](docs/design-system.md) —— 设计系统与组件规范
-- [`docs/CONTRACT.md`](docs/CONTRACT.md) —— 前后端接口契约（改接口先读这个）
+- [`docs/requirements.md`](docs/requirements.md) —— 需求与验收标准
+- [`docs/architecture.md`](docs/architecture.md) —— 架构与请求流程（v1 架构说明，Go 版见 CONTRACT）
+- [`docs/design-system.md`](docs/design-system.md) —— 设计系统
+- [`docs/CONTRACT.md`](docs/CONTRACT.md) —— API/数据模型/前端约定

@@ -1,26 +1,24 @@
 # dependencies
 /node_modules
+/web/node_modules
+/web/dist
+/web/.vite
 /.pnp
 .pnp.*
 .yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
 
-# next.js
-/.next/
-/out/
-next-env.d.ts
+# build / test artifacts
+*.exe
+*.test
+*.out
+aiworkspace
+coverage/
+dist/
 
-# production
-/build
-
-# prisma / sqlite
-/prisma/*.db
-/prisma/*.db-journal
-/prisma/migrations/dev.db*
-/data/
+# Go
+/server/data/
+/server/webdist/*
+!/server/webdist/index.html
 *.db
 *.db-journal
 *.sqlite
@@ -42,17 +40,15 @@ Thumbs.db
 !.vscode/extensions.json
 !.vscode/settings.json
 
-# debug
+# logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
 
 # typescript
 *.tsbuildinfo
-
-# docker
-.dockerignore.local
 
 # DSH 插件工具在会话目录里生成的临时产物
 github-repos/
@@ -60,3 +56,6 @@ github-repos/
 
 # uploads (学生作业附件，后续版本)
 /uploads/
+
+# 本地工具（Go 安装包等）
+/.tools/

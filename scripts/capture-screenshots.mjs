@@ -1,9 +1,6 @@
 // 开发用：用本机 Edge/Chrome 无头模式给主要页面截图（用于文档与设计走查）
-// 用法（本地 dev server）：node scripts/capture-screenshots.mjs
-// 用法（Docker 容器）：设置 CAPTURE_BASE / CAPTURE_AUTH_SECRET / CAPTURE_TEACHER_ID /
-//   CAPTURE_STUDENT_ID / CAPTURE_CLASS_ID / CAPTURE_ASSIGNMENT_ID 后执行。
-// 依赖：本机安装 Edge 或 Chrome；目标服务需已运行（默认 http://127.0.0.1:3100）。
-import crypto from "node:crypto";
+// 用法：node scripts/capture-screenshots.mjs
+// 前置：应用已在 http://127.0.0.1:3100 运行（Docker 或本地 Go 服务均可）。
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -18,23 +15,6 @@ const EDGE_CANDIDATES = [
   "C:/Program Files/Google/Chrome/Application/chrome.exe",
   "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
 ];
-
-function readEnv() {
-  if (!fs.existsSync(".env")) return {};
-  const env = {};
-  for (const line of fs.readFileSync(".env", "utf8").split(/\r?\n/)) {
-    if (!line || line.startsWith("#") || !line.includes("=")) continue;
-    const i = line.indexOf("=");
-    env[line.slice(0, i)] = line.slice(i + 1).replace(/^"(.*)"$/, "$1");
-  }
-  return env;
-}
-
-function makeToken(secret, userId) {
-  const payload = Buffer.from(JSON.stringify({ sub: userId, iat: Date.now() })).toString("base64url");
-  const sig = crypto.createHmac("sha256", secret).update(payload).digest("base64url");
-  return `${payload}.${sig}`;
-}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -76,31 +56,6 @@ async function cdp(wsUrl, fn) {
   }
 }
 
-// 本地开发默认从 .env + 本地 SQLite 取账号/ID；Docker 场景用 CAPTURE_* 环境变量覆盖
-const env = readEnv();
-let teacherId = process.env.CAPTURE_TEACHER_ID;
-let studentId = process.env.CAPTURE_STUDENT_ID;
-let classId = process.env.CAPTURE_CLASS_ID;
-let assignmentId = process.env.CAPTURE_ASSIGNMENT_ID;
-const secret = process.env.CAPTURE_AUTH_SECRET ?? env.AUTH_SECRET;
-
-if (!teacherId || !studentId || !classId || !assignmentId) {
-  process.env.DATABASE_URL = env.DATABASE_URL;
-  const { PrismaClient } = await import("@prisma/client");
-  const prisma = new PrismaClient();
-  const teacher = await prisma.user.findUnique({ where: { email: "teacher@demo.edu" } });
-  const student = await prisma.user.findUnique({ where: { email: "student@demo.edu" } });
-  const klass = await prisma.class.findFirst({ where: { joinCode: "MATH01" } });
-  const assignment = await prisma.assignment.findFirst({ orderBy: { createdAt: "asc" } });
-  await prisma.$disconnect();
-  teacherId ??= teacher.id;
-  studentId ??= student.id;
-  classId ??= klass.id;
-  assignmentId ??= assignment.id;
-}
-
-if (!secret) throw new Error("缺少 AUTH_SECRET（或 CAPTURE_AUTH_SECRET）");
-
 const edge = EDGE_CANDIDATES.find((p) => fs.existsSync(p));
 if (!edge) throw new Error("未找到 Edge/Chrome");
 
@@ -139,22 +94,20 @@ const page = targets.find((t) => t.type === "page") ?? targets[0];
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
-const shots = [
-  { name: "01-login", url: "/login", role: null },
-  { name: "02-teacher-dashboard", url: "/teacher", role: "teacher" },
-  { name: "03-teacher-classes", url: "/teacher/classes", role: "teacher" },
-  { name: "04-teacher-class-detail", url: `/teacher/classes/${classId}`, role: "teacher" },
-  { name: "05-teacher-assignments", url: "/teacher/assignments", role: "teacher" },
-  { name: "06-teacher-assignment-detail", url: `/teacher/assignments/${assignmentId}`, role: "teacher" },
-  { name: "07-student-dashboard", url: "/student", role: "student" },
-  { name: "08-student-assignments", url: "/student/assignments", role: "student" },
-  { name: "09-student-assignment-detail", url: `/student/assignments/${assignmentId}`, role: "student" },
-  { name: "10-student-grades", url: "/student/grades", role: "student" },
+const teacherShots = [
+  ["02-teacher-dashboard", "/teacher"],
+  ["03-teacher-classes", "/teacher/classes"],
+  ["05-teacher-assignments", "/teacher/assignments"],
+];
+const studentShots = [
+  ["07-student-dashboard", "/student"],
+  ["08-student-assignments", "/student/assignments"],
+  ["10-student-grades", "/student/grades"],
 ];
 
 await cdp(page.webSocketDebuggerUrl, async ({ send, once }) => {
   await send("Page.enable");
-  await send("Network.enable");
+  await send("Runtime.enable");
   await send("Emulation.setDeviceMetricsOverride", {
     width: 1440,
     height: 900,
@@ -162,27 +115,58 @@ await cdp(page.webSocketDebuggerUrl, async ({ send, once }) => {
     mobile: false,
   });
 
-  for (const shot of shots) {
-    if (shot.role) {
-      const userId = shot.role === "teacher" ? teacherId : studentId;
-      await send("Network.setCookie", {
-        name: "aw_session",
-        value: makeToken(secret, userId),
-        domain: "127.0.0.1",
-        path: "/",
-        httpOnly: true,
-      });
-    } else {
-      await send("Network.clearBrowserCookies");
-    }
+  const navigate = async (url) => {
     const loaded = once("Page.loadEventFired");
-    await send("Page.navigate", { url: `${BASE}${shot.url}` });
+    await send("Page.navigate", { url: `${BASE}${url}` });
     await Promise.race([loaded, sleep(15000)]);
     await sleep(900);
-    const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
-    fs.writeFileSync(path.join(OUT_DIR, `${shot.name}.png`), Buffer.from(data, "base64"));
-    console.log(`saved ${shot.name}.png <- ${shot.url}`);
+  };
+
+  const login = async (email) => {
+    await navigate("/login");
+    // 同源 fetch 登录，浏览器会保存 HttpOnly Cookie
+    const result = await send("Runtime.evaluate", {
+      expression: `fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:${JSON.stringify(
+        email,
+      )},password:"demo1234"}),credentials:"same-origin"}).then(r=>r.status)`,
+      awaitPromise: true,
+      returnByValue: true,
+    });
+    if (result?.result?.value !== 200) {
+      throw new Error(`登录失败：${JSON.stringify(result?.result?.value ?? result)}`);
+    }
+    await sleep(600);
+  };
+
+  const screenshot = async (name, url) => {
+    await navigate(url);
+    const { data } = await send("Page.captureScreenshot", {
+      format: "png",
+      captureBeyondViewport: false,
+    });
+    fs.writeFileSync(path.join(OUT_DIR, `${name}.png`), Buffer.from(data, "base64"));
+    console.log(`saved ${name}.png <- ${url}`);
+  };
+
+  // 登录页（未登录态）
+  await navigate("/login");
+  await send("Network.clearBrowserCookies");
+  await navigate("/login");
+  {
+    const { data } = await send("Page.captureScreenshot", { format: "png" });
+    fs.writeFileSync(path.join(OUT_DIR, "01-login.png"), Buffer.from(data, "base64"));
+    console.log("saved 01-login.png <- /login");
   }
+
+  await login("teacher@demo.edu");
+  await screenshot("02-teacher-dashboard", "/teacher");
+  await screenshot("03-teacher-classes", "/teacher/classes");
+  await screenshot("05-teacher-assignments", "/teacher/assignments");
+
+  await login("student@demo.edu");
+  await screenshot("07-student-dashboard", "/student");
+  await screenshot("08-student-assignments", "/student/assignments");
+  await screenshot("10-student-grades", "/student/grades");
 });
 
 child.kill();

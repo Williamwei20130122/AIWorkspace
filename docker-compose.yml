@@ -1,27 +1,28 @@
-# AIWorkspace 教学系统 —— 单容器部署（Next.js + SQLite）
+# AIWorkspace 教学系统 —— 单容器部署（Go 后端内嵌 React 前端 + SQLite）
 # 宿主机访问地址：http://localhost:3100
 #
 # 使用：
 #   cp .env.example .env        # 修改 AUTH_SECRET 为随机长字符串
 #   docker compose up -d --build
 #   docker compose logs -f web
-#
-# 数据持久化在命名卷 aiworkspace-data 中（容器内 /data/app.db）。
 
 services:
   web:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # 国内网络可用镜像源；能直连官方源时删掉这两行即可
+        NPM_REGISTRY: https://registry.npmmirror.com
+        GOPROXY: https://goproxy.cn,direct
     image: aiworkspace:latest
     container_name: aiworkspace-web
     restart: unless-stopped
     ports:
       - "3100:3100"
     environment:
-      DATABASE_URL: "file:/data/app.db"
       PORT: "3100"
-      HOSTNAME: "0.0.0.0"
+      DATABASE_PATH: /data/app.db
       # 生产环境务必替换：openssl rand -base64 48
       AUTH_SECRET: "${AUTH_SECRET:-aiworkspace-dev-secret-change-me}"
       # 首次启动（空库）自动写入演示数据；设为 0 可关闭
@@ -33,7 +34,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 20s
 
 volumes:
   aiworkspace-data:

@@ -1,0 +1,97 @@
+// Package db 负责 SQLite 数据库的打开、建表迁移与演示数据种子。
+package db
+
+import (
+	"crypto/rand"
+	"database/sql"
+	_ "embed"
+	"encoding/hex"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	_ "modernc.org/sqlite"
+)
+
+//go:embed schema.sql
+var schemaSQL string
+
+// Now 返回统一格式的当前 UTC 时间字符串（RFC3339）。
+func Now() string {
+	return time.Now().UTC().Format(time.RFC3339)
+}
+
+// FormatTime 把时间转成统一的 RFC3339（UTC）字符串。
+func FormatTime(t time.Time) string {
+	return t.UTC().Format(time.RFC3339)
+}
+
+// Open 打开（必要时创建）SQLite 数据库文件并执行建表迁移。
+func Open(path string) (*sql.DB, error) {
+	if path == "" {
+		return nil, fmt.Errorf("DATABASE_PATH 不能为空")
+	}
+	// 确保数据库文件所在目录存在（默认 ./data/app.db）。
+	if path != ":memory:" {
+		if dir := filepath.Dir(path); dir != "" && dir != "." {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				return nil, fmt.Errorf("创建数据库目录 %s 失败: %w", dir, err)
+			}
+		}
+	}
+
+	dsn := sqliteDSN(path)
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("打开数据库失败: %w", err)
+	}
+	// SQLite 同一时刻只允许一个写者；单连接可避免 SQLITE_BUSY，本系统数据量很小。
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	db.SetConnMaxLifetime(0)
+
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("连接数据库失败: %w", err)
+	}
+	if err := Migrate(db); err != nil {
+		db.Close()
+		return nil, err
+	}
+	return db, nil
+}
+
+// sqliteDSN 构造 modernc.org/sqlite 的连接串，开启 WAL、外键与忙等待。
+func sqliteDSN(path string) string {
+	if path == ":memory:" {
+		return "file::memory:?cache=shared&_pragma=busy_timeout(5000)&_pragma=foreign_keys(ON)"
+	}
+	return "file:" + filepath.ToSlash(path) +
+		"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)"
+}
+
+// Migrate 执行内嵌 schema.sql 建表（每条语句单独执行，可重复调用）。
+func Migrate(db *sql.DB) error {
+	for _, stmt := range strings.Split(schemaSQL, ";") {
+		stmt = strings.TrimSpace(stmt)
+		if stmt == "" {
+			continue
+		}
+		if _, err := db.Exec(stmt); err != nil {
+			return fmt.Errorf("执行数据库迁移失败: %w", err)
+		}
+	}
+	return nil
+}
+
+// NewID 生成带前缀的随机 id（cuid 风格，24 位十六进制随机串）。
+func NewID(prefix string) string {
+	buf := make([]byte, 12)
+	if _, err := rand.Read(buf); err != nil {
+		// crypto/rand 在正常系统上不会失败；失败说明运行环境异常，直接终止更安全。
+		panic("生成随机 id 失败: " + err.Error())
+	}
+	return prefix + hex.EncodeToString(buf)
+}

@@ -1,5 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /api/
-
-# 校内教学系统：如需禁止搜索引擎收录，部署后把上面改成 Disallow: /
