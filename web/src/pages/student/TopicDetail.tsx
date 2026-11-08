@@ -142,6 +142,8 @@ export default function StudentTopicDetail() {
   const submissionFiles = submission?.files ?? [];
   const evaluations = data.myEvaluations ?? [];
   const evaluated = evaluations.length > 0;
+  const latestEvaluation =
+    [...evaluations].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0] ?? null;
   const ownerName = data.owner?.name?.trim();
   const assistantNames = (data.assistants ?? []).map((assistant) => assistant.name).filter(Boolean);
   const headerMeta = ownerName ? `${ownerName} 老师` : "课题";
@@ -277,32 +279,65 @@ export default function StudentTopicDetail() {
         </div>
 
         <aside className="order-1 lg:order-2 lg:sticky lg:top-8 lg:self-start">
-          <Card>
-            <CardHeader>
-              <div>
-                <CardTitle>{evaluated ? "已评价" : submission ? "重新提交" : "提交"}</CardTitle>
-                <CardDescription>
-                  {evaluated
-                    ? "老师已评价，不能重新提交"
-                    : closed
-                      ? "课题已关闭，提交已停止"
-                      : "文本 + 任意附件，可多次提交"}
-                </CardDescription>
-              </div>
-              <span className="grid size-9 place-items-center rounded-xl bg-amber-50 text-amber-700">
-                {evaluated || submission ? <IconCheck /> : <IconFile />}
-              </span>
-            </CardHeader>
-            <CardContent>
-              <SubmitForm
-                topicId={data.id}
-                closed={closed}
-                evaluated={evaluated}
-                submission={submission}
-                onSubmitted={() => void load(false)}
-              />
-            </CardContent>
-          </Card>
+          {evaluated ? (
+            <Card>
+              <CardHeader>
+                <div>
+                  <CardTitle>本次评价</CardTitle>
+                  <CardDescription>老师已完成评价，提交内容已锁定</CardDescription>
+                </div>
+                <span className="grid size-9 place-items-center rounded-xl bg-brand-50 text-brand-700">
+                  <IconCheck />
+                </span>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {latestEvaluation ? (
+                  <>
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-soft">
+                      <span className="font-medium text-brand-900">
+                        {latestEvaluation.teacher?.name
+                          ? `${latestEvaluation.teacher.name} 老师`
+                          : "老师评价"}
+                      </span>
+                      <span>{formatDateTime(latestEvaluation.createdAt)}</span>
+                    </div>
+                    <EvaluationScores scores={latestEvaluation.scores} />
+                    <p className="whitespace-pre-wrap text-sm leading-6 text-ink-soft">
+                      {latestEvaluation.comment?.trim() || "老师没有填写评语。"}
+                    </p>
+                    <p className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs leading-relaxed text-brand-800">
+                      老师已评价，不能重新提交；全部历史评价见下方「我的评价」。
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-ink-soft">老师已评价，提交内容已锁定。</p>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <div>
+                  <CardTitle>{submission ? "重新提交" : "提交"}</CardTitle>
+                  <CardDescription>
+                    {closed ? "课题已关闭，提交已停止" : "文本 + 任意附件，可多次提交"}
+                  </CardDescription>
+                </div>
+                <span className="grid size-9 place-items-center rounded-xl bg-amber-50 text-amber-700">
+                  {submission ? <IconCheck /> : <IconFile />}
+                </span>
+              </CardHeader>
+              <CardContent>
+                <SubmitForm
+                  topicId={data.id}
+                  closed={closed}
+                  evaluated={evaluated}
+                  submission={submission}
+                  onSubmitted={() => void load(false)}
+                />
+              </CardContent>
+            </Card>
+          )}
         </aside>
       </div>
     </AppShell>
