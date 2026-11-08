@@ -111,7 +111,7 @@ evaluation_scores ( id TEXT PK, evaluation_id TEXT NOT NULL, dimension_id TEXT N
 
 ### 教师
 
-- `GET /api/teacher/overview` → `{topicCount, studentCount, pendingEvaluationCount, recentEvaluations:[{id, createdAt, comment, student:{id,name}, topic:{id,title}}], topics:[{id,title,status,memberCount,submissionCount,pendingCount}]}`
+- `GET /api/teacher/overview` → `{topicCount, studentCount, pendingEvaluationCount, recentEvaluations:[...], pendingSubmissions:[{id, topicId, topicTitle, student:{id,name}, submittedAt}], topics:[{id,title,status,memberCount,submissionCount,pendingCount}]}`（pendingSubmissions 为待评价队列，最多 8 条，按提交时间升序）
 - `GET /api/teacher/topics?page=1&pageSize=8&status=ALL|ACTIVE|CLOSED&keyword=xxx`
   → 分页对象 `{ items: [{id, title, status, joinMode, owner:{id,name}, isOwner, memberCount, submissionCount, pendingCount, updatedAt}], total, page, pageSize, stats: {active, closed, pendingTotal} }`（pageSize 最大 50；keyword 匹配标题；stats 为该教师管理课题的全局统计，不随筛选变化）
 - `POST /api/teacher/topics` `{title, descriptionMd?}` → 201 `{id}`

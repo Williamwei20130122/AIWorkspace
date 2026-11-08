@@ -65,11 +65,21 @@ type Health struct {
 
 // TeacherOverview GET /api/teacher/overview 响应。
 type TeacherOverview struct {
-	TopicCount             int                `json:"topicCount"`
-	StudentCount           int                `json:"studentCount"`
-	PendingEvaluationCount int                `json:"pendingEvaluationCount"`
-	RecentEvaluations      []RecentEvaluation `json:"recentEvaluations"`
-	Topics                 []OverviewTopic    `json:"topics"`
+	TopicCount             int                 `json:"topicCount"`
+	StudentCount           int                 `json:"studentCount"`
+	PendingEvaluationCount int                 `json:"pendingEvaluationCount"`
+	RecentEvaluations      []RecentEvaluation  `json:"recentEvaluations"`
+	PendingSubmissions     []PendingSubmission `json:"pendingSubmissions"`
+	Topics                 []OverviewTopic     `json:"topics"`
+}
+
+// PendingSubmission 工作台「待评价队列」。
+type PendingSubmission struct {
+	ID          string `json:"id"`
+	TopicID     string `json:"topicId"`
+	TopicTitle  string `json:"topicTitle"`
+	Student     IDName `json:"student"`
+	SubmittedAt string `json:"submittedAt"`
 }
 
 // RecentEvaluation 工作台「最近评价」。

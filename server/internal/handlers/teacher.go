@@ -27,8 +27,9 @@ func (h *API) TeacherOverview(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	overview := models.TeacherOverview{
-		RecentEvaluations: []models.RecentEvaluation{},
-		Topics:            []models.OverviewTopic{},
+		RecentEvaluations:  []models.RecentEvaluation{},
+		PendingSubmissions: []models.PendingSubmission{},
+		Topics:             []models.OverviewTopic{},
 	}
 
 	if err := h.DB.QueryRowContext(ctx,
@@ -122,6 +123,49 @@ func (h *API) TeacherOverview(w http.ResponseWriter, r *http.Request) {
 			Comment:   item.Comment,
 			Student:   models.IDName{ID: item.StudentID, Name: item.StudentName},
 			Topic:     models.IDName{ID: item.TopicID, Name: item.TopicTitle},
+		})
+	}
+
+	type pendingRow struct {
+		ID, TopicID, TopicTitle, StudentID, StudentName, SubmittedAt string
+	}
+	pending := make([]pendingRow, 0)
+	rows, err = h.DB.QueryContext(ctx,
+		`SELECT s.id, t.id, t.title, su.id, su.name, s.updated_at
+		 FROM submissions s
+		 JOIN topics t ON t.id = s.topic_id
+		 JOIN users su ON su.id = s.student_id
+		 WHERE `+managedTopicsSQL+`
+		   AND NOT EXISTS (SELECT 1 FROM evaluations e WHERE e.submission_id = s.id)
+		 ORDER BY s.updated_at ASC, s.id
+		 LIMIT 8`, user.ID, user.ID)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	for rows.Next() {
+		var item pendingRow
+		if err := rows.Scan(&item.ID, &item.TopicID, &item.TopicTitle,
+			&item.StudentID, &item.StudentName, &item.SubmittedAt); err != nil {
+			_ = rows.Close()
+			serverError(w, err)
+			return
+		}
+		pending = append(pending, item)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		serverError(w, err)
+		return
+	}
+	_ = rows.Close()
+	for _, item := range pending {
+		overview.PendingSubmissions = append(overview.PendingSubmissions, models.PendingSubmission{
+			ID:          item.ID,
+			TopicID:     item.TopicID,
+			TopicTitle:  item.TopicTitle,
+			Student:     models.IDName{ID: item.StudentID, Name: item.StudentName},
+			SubmittedAt: item.SubmittedAt,
 		})
 	}
 

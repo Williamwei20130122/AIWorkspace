@@ -128,7 +128,17 @@ export interface TeacherOverview {
   studentCount: number;
   pendingEvaluationCount: number;
   recentEvaluations: EvaluationListItem[];
+  pendingSubmissions: PendingSubmission[];
   topics: TopicSummary[];
+}
+
+/** 工作台「待评价队列」 */
+export interface PendingSubmission {
+  id: string;
+  topicId: string;
+  topicTitle: string;
+  student: { id: string; name: string };
+  submittedAt: string;
 }
 
 export interface EvaluationListItem {
