@@ -1,24 +1,30 @@
 # AIWorkspace · 教学系统（课题 · 提交 · 评价）
 
-面向学校 **教师** 与 **学生** 的轻量网页教学系统：老师创建课题、管理学生与助教；学生用学号进入，提交作品（文本 + 任意文件）；老师进行多维度评分与文字评价。
+面向学校 **教师** 与 **学生** 的轻量网页教学系统：老师创建班级与课题、管理学生与助教；学生用学号进入，提交作品（文本 + 任意文件）；老师进行多维度评分与文字评价；课题支持分组与小组提交。
 
 技术栈：**Go 1.27**（标准库 HTTP + 纯 Go SQLite）+ **React 19 / Vite / TypeScript / Tailwind CSS v4**；单容器 Docker 部署，宿主机 **3100 端口** 访问。
 
 > Git 远端：`https://github.com/Williamwei20130122/AIWorkspace`
-> 历史版本：v1 Next.js 全栈在 `feat/project-base`；v2 班级/作业模型在 `feat/go-ts`；当前 v3 在 `feat/topic-model`。
+> 历史版本：v1 Next.js 全栈在 `feat/project-base`；v2 班级/作业模型在 `feat/go-ts`；当前 v4 在 `feat/topic-model`。
 
 ---
 
 ## 1. 产品模型
 
-**课题（Topic）→ 提交（Submission）→ 评价（Evaluation）**
+**班级（Class）→ 课题（Topic）→ 提交（Submission）→ 评价（Evaluation）**
+
+- **班级**：老师创建班级并添加学生；课题属于班级，创建课题时从班级学生中勾选参与人。
+- **分组**：课题可选择「个人提交 / 小组提交」；每组人数上下限可配置；老师可建组/随机分组，学生也可自行组队（可开关）；小组提交时组员共享提交与评价。
+- **评价**：老师自定义评分维度 + 文字评语，可多次评价；老师评价后提交锁定。
 
 ### 教师端
 
 - **账号**：用**邮箱或手机号**注册 / 登录（自助注册）
-- **课题**：创建课题、编辑介绍页（支持 Markdown）、关闭/恢复课题
+- **班级管理**：创建班级、添加/移出学生（保留历史）、查看班级课题
+- **课题**：选择班级创建，从班级学生中勾选参与人；Markdown 介绍页；关闭/恢复课题
 - **课题管理**：仪表盘（统计 + 状态分布）+ 标题搜索 + 状态筛选 + 分页表格
 - **协作**：邀请**最多 3 名助教**共同管理；创建者权限**可移交**
+- **分组**：提交模式（个人/小组）、每组人数上下限、允许学生自组开关；建组/改名/删组/加人/移出/随机分组
 - **学生管理**：创建学生账号（姓名 + 默认用户名）；学生可被多位老师管理；
   - 用户名冲突时先展示已有账号信息，由老师判断「同一个人 → 加入我的管理」或「不同人 → 换用户名重新创建」
   - 可重置 / 关闭学生密码，但**永远看不到明文**
@@ -30,10 +36,12 @@
 ### 学生端
 
 - **登录**：老师分配的**默认用户名（学号）**直接登录，默认无密码；可自行设置/清除密码
+- **我的班级**：查看所在班级
 - **工作台**：课题状态筛选（全部/未提交/已提交）+ 最近评价 + 账号安全
 - **我的课题**：当前课题 + 曾经加入过的历史课题
 - **课题介绍页**：Markdown 渲染
-- **提交**：文本（原样展示，不渲染 Markdown/LaTeX）+ 任意类型文件多文件上传；可重新提交
+- **分组**：我的小组与组员；允许学生自组时可创建/加入/退出小组；小组提交需满足人数下限
+- **提交**：文本（原样展示，不渲染 Markdown/LaTeX）+ 任意类型文件多文件上传；个人提交或小组共享提交
 - **已评价锁定**：老师评价后不能重新提交（防篡改）
 - **我的评价**：查看自己全部历史评价（多维得分 + 评语）
 
@@ -52,16 +60,20 @@
 | --- | --- | --- |
 | ![登录页](docs/screenshots/01-login.png) | ![教师工作台](docs/screenshots/02-teacher-dashboard.png) | ![课题管理](docs/screenshots/03-teacher-topics.png) |
 
-| 课题详情（教师） | 学生工作台 | 学生课题详情 |
+| 课题详情（教师，含分组） | 班级管理 | 学生工作台 |
 | --- | --- | --- |
-| ![教师课题详情](docs/screenshots/04-teacher-topic-detail.png) | ![学生工作台](docs/screenshots/07-student-dashboard.png) | ![学生课题详情](docs/screenshots/09-student-topic-detail.png) |
+| ![教师课题详情](docs/screenshots/04-teacher-topic-detail.png) | ![班级管理](docs/screenshots/11-teacher-classes.png) | ![学生工作台](docs/screenshots/07-student-dashboard.png) |
+
+| 班级详情 | 学生课题详情（小组） | 学生我的班级 |
+| --- | --- | --- |
+| ![班级详情](docs/screenshots/12-teacher-class-detail.png) | ![学生课题详情](docs/screenshots/09-student-topic-detail.png) | ![学生我的班级](docs/screenshots/13-student-classes.png) |
 
 截图在 [`docs/screenshots/`](docs/screenshots/)，由 `node scripts/capture-screenshots.mjs` 自动生成。
 
 ### 当前状态
 
-- v3（课题-提交-评价）已完成：Go 后端 + React 前端 + Docker 单容器 3100
-- 验证：`scripts/verify-v3.mjs` 全流程 30 项通过；Go `vet/build/test` 通过；容器内复测通过
+- v4（班级 + 课题分组 + 小组提交）已完成：Go 后端 + React 前端 + Docker 单容器 3100
+- 验证：后端 `go vet/build/test` 通过；班级/分组/小组提交端到端 148 项通过；容器内页面与 API 实测通过
 - Git：`feat/topic-model` 分支 → PR #2（draft）
 - 浏览器插件 BrowserSkill 已接入（CLI + DSH 插件）；浏览器扩展需手动安装
 
