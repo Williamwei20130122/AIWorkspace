@@ -1,0 +1,39 @@
+# AIWorkspace 教学系统 —— 单容器部署（Next.js + SQLite）
+# 宿主机访问地址：http://localhost:3100
+#
+# 使用：
+#   cp .env.example .env        # 修改 AUTH_SECRET 为随机长字符串
+#   docker compose up -d --build
+#   docker compose logs -f web
+#
+# 数据持久化在命名卷 aiworkspace-data 中（容器内 /data/app.db）。
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: aiworkspace:latest
+    container_name: aiworkspace-web
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    environment:
+      DATABASE_URL: "file:/data/app.db"
+      PORT: "3100"
+      HOSTNAME: "0.0.0.0"
+      # 生产环境务必替换：openssl rand -base64 48
+      AUTH_SECRET: "${AUTH_SECRET:-aiworkspace-dev-secret-change-me}"
+      # 首次启动（空库）自动写入演示数据；设为 0 可关闭
+      SEED_ON_START: "${SEED_ON_START:-1}"
+    volumes:
+      - aiworkspace-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3100/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  aiworkspace-data:

@@ -1,0 +1,233 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-brand-50: #f0fdfa;
+  --color-brand-100: #ccfbf1;
+  --color-brand-200: #99f6e4;
+  --color-brand-300: #5eead4;
+  --color-brand-400: #2dd4bf;
+  --color-brand-500: #14b8a6;
+  --color-brand-600: #0d9488;
+  --color-brand-700: #0f766e;
+  --color-brand-800: #115e59;
+  --color-brand-900: #134e4a;
+
+  --color-ink: #134e4a;
+  --color-ink-soft: #3f6b66;
+  --color-surface: #f0fdfa;
+  --color-card: #ffffff;
+  --color-muted: #e8f1f4;
+  --color-line: #d5ece8;
+  --color-accent: #d97706;
+  --color-danger: #dc2626;
+  --color-success: #0f766e;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-brand-200);
+    color: var(--color-brand-900);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+  }
+}
+
+/* ---------- 基础组件样式（纯 CSS，Tailwind 工具类可继续叠加） ---------- */
+
+.aw-card {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+}
+
+.aw-input {
+  width: 100%;
+  border: 1px solid #cfe8e3;
+  border-radius: 10px;
+  background-color: #ffffff;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-ink);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.aw-input::placeholder {
+  color: #8fb3ae;
+}
+
+.aw-input:focus {
+  outline: none;
+  border-color: var(--color-brand-600);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+}
+
+.aw-input:disabled {
+  background-color: var(--color-brand-50);
+  color: var(--color-ink-soft);
+  cursor: not-allowed;
+}
+
+.aw-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  margin-bottom: 6px;
+}
+
+.aw-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease,
+    opacity 150ms ease;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.aw-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.aw-btn-primary {
+  background-color: var(--color-brand-600);
+  color: #ffffff;
+}
+
+.aw-btn-primary:hover:not(:disabled) {
+  background-color: var(--color-brand-700);
+}
+
+.aw-btn-secondary {
+  background-color: #ffffff;
+  border-color: var(--color-line);
+  color: var(--color-brand-800);
+}
+
+.aw-btn-secondary:hover:not(:disabled) {
+  background-color: var(--color-brand-50);
+  border-color: var(--color-brand-300);
+}
+
+.aw-btn-accent {
+  background-color: var(--color-accent);
+  color: #ffffff;
+}
+
+.aw-btn-accent:hover:not(:disabled) {
+  background-color: #b45309;
+}
+
+.aw-btn-ghost {
+  background-color: transparent;
+  color: var(--color-brand-800);
+}
+
+.aw-btn-ghost:hover:not(:disabled) {
+  background-color: var(--color-brand-50);
+}
+
+.aw-btn-danger {
+  background-color: #ffffff;
+  border-color: #fecaca;
+  color: var(--color-danger);
+}
+
+.aw-btn-danger:hover:not(:disabled) {
+  background-color: #fef2f2;
+}
+
+.aw-btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.aw-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.aw-badge-brand {
+  background-color: var(--color-brand-50);
+  border-color: var(--color-brand-200);
+  color: var(--color-brand-700);
+}
+
+.aw-badge-success {
+  background-color: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+.aw-badge-warning {
+  background-color: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
+}
+
+.aw-badge-danger {
+  background-color: #fef2f2;
+  border-color: #fecaca;
+  color: var(--color-danger);
+}
+
+.aw-badge-neutral {
+  background-color: var(--color-muted);
+  border-color: var(--color-line);
+  color: var(--color-ink-soft);
+}
+
+.aw-badge-info {
+  background-color: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+/* 滚动条 */
+.aw-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.aw-scroll::-webkit-scrollbar-thumb {
+  background-color: #cbe7e1;
+  border-radius: 999px;
+}
