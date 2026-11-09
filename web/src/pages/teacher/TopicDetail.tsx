@@ -67,6 +67,7 @@ export default function TeacherTopicDetailPage() {
   if (!user) return null;
 
   const isOwner = Boolean(topic && topic.owner.id === user.id);
+  const closed = topic?.status === "CLOSED";
 
   async function toggleStatus(next: TopicStatus) {
     if (!topic || statusPending) return;
@@ -177,6 +178,11 @@ export default function TeacherTopicDetailPage() {
             ) : null}
           </div>
           <FormMessage error={statusError ?? undefined} />
+          {closed ? (
+            <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
+              课题已关闭：成员、分组、维度与评价均为只读；如仍需修改，请先「恢复课题」。
+            </p>
+          ) : null}
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
             <div className="min-w-0 space-y-6">
@@ -187,7 +193,7 @@ export default function TeacherTopicDetailPage() {
                 <MarkdownEditor
                   topicId={topic.id}
                   value={topic.descriptionMd}
-                  canEdit={isOwner}
+                  canEdit={isOwner && !closed}
                   onSaved={() => void load()}
                 />
               </Panel>
@@ -205,16 +211,18 @@ export default function TeacherTopicDetailPage() {
                   ) : null
                 }
               >
-                <GroupManager
-                  topicId={topic.id}
-                  groups={topic.groups}
-                  students={topic.students}
-                  submitMode={topic.submitMode}
-                  groupMin={topic.groupMin}
-                  groupMax={topic.groupMax}
-                  canManage
-                  onChanged={() => void load()}
-                />
+                <div className={closed ? "pointer-events-none opacity-60" : undefined}>
+                  <GroupManager
+                    topicId={topic.id}
+                    groups={topic.groups}
+                    students={topic.students}
+                    submitMode={topic.submitMode}
+                    groupMin={topic.groupMin}
+                    groupMax={topic.groupMax}
+                    canManage
+                    onChanged={() => void load()}
+                  />
+                </div>
               </Panel>
 
               <Panel
@@ -230,29 +238,35 @@ export default function TeacherTopicDetailPage() {
                   )
                 }
               >
-                <SubmissionList
-                  submissions={topic.submissions}
-                  dimensions={topic.dimensions}
-                  onChanged={() => void load()}
-                />
+                <div className={closed ? "pointer-events-none opacity-60" : undefined}>
+                  <SubmissionList
+                    submissions={topic.submissions}
+                    dimensions={topic.dimensions}
+                    onChanged={() => void load()}
+                  />
+                </div>
               </Panel>
             </div>
 
             <div className="min-w-0 space-y-6">
               <Panel title="成员管理" description="学生从班级学生中勾选；助教最多 3 名，移出后保留历史">
-                <MemberManager topic={topic} isOwner={isOwner} onChanged={() => void load()} />
+                <div className={closed ? "pointer-events-none opacity-60" : undefined}>
+                  <MemberManager topic={topic} isOwner={isOwner} onChanged={() => void load()} />
+                </div>
               </Panel>
 
               <Panel title="分组设置" description="提交模式、每组人数与是否允许学生自行组队">
-                <GroupSettings topic={topic} canEdit={isOwner} onChanged={() => void load()} />
+                <GroupSettings topic={topic} canEdit={isOwner && !closed} onChanged={() => void load()} />
               </Panel>
 
               <Panel title="评价维度" description="维度属于课题，评价时按维度打分（0 到满分）">
-                <DimensionManager
-                  topicId={topic.id}
-                  dimensions={topic.dimensions}
-                  onChanged={() => void load()}
-                />
+                <div className={closed ? "pointer-events-none opacity-60" : undefined}>
+                  <DimensionManager
+                    topicId={topic.id}
+                    dimensions={topic.dimensions}
+                    onChanged={() => void load()}
+                  />
+                </div>
               </Panel>
             </div>
           </div>

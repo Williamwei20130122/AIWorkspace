@@ -163,18 +163,17 @@ await cdp(page.webSocketDebuggerUrl, async ({ send, once }) => {
   await shot("05-teacher-students", "/teacher/students");
   await shot("06-teacher-evaluations", "/teacher/evaluations");
 
-  // 管理员（密码通过 CAPTURE_ADMIN_PASSWORD 传入，不写入仓库）
-  if (process.env.CAPTURE_ADMIN_PASSWORD) {
-    await login("admin", process.env.CAPTURE_ADMIN_PASSWORD);
-    await shot("15-admin-dashboard", "/admin");
-  }
   const teacherTopicId = await evaluate(
-    `fetch("/api/teacher/topics?pageSize=1",{credentials:"same-origin"}).then(r=>r.json()).then(d=>(d.items&&d.items[0]&&d.items[0].id)||(Array.isArray(d)&&d[0]&&d[0].id))`,
+    `fetch("/api/teacher/topics?pageSize=20",{credentials:"same-origin"}).then(r=>r.json()).then(d=>{const xs=(d.items||d)||[];const active=xs.find(x=>x.status==="ACTIVE");return (active&&active.id)||(xs[0]&&xs[0].id)})`,
   );
   if (teacherTopicId) {
     await shot("04-teacher-topic-detail", `/teacher/topics/${teacherTopicId}`);
     await shotScrolled("14-teacher-topic-detail-scrolled", `/teacher/topics/${teacherTopicId}`, 760);
   }
+  const closedTopicId = await evaluate(
+    `fetch("/api/teacher/topics?pageSize=20",{credentials:"same-origin"}).then(r=>r.json()).then(d=>{const xs=(d.items||d)||[];const closed=xs.find(x=>x.status==="CLOSED");return closed?closed.id:null})`,
+  );
+  if (closedTopicId) await shot("16-teacher-topic-closed", `/teacher/topics/${closedTopicId}`);
 
   // v4：班级管理
   const teacherClassId = await evaluate(
@@ -193,6 +192,12 @@ await cdp(page.webSocketDebuggerUrl, async ({ send, once }) => {
     `fetch("/api/student/topics",{credentials:"same-origin"}).then(r=>r.json()).then(xs=>xs[0]&&xs[0].id)`,
   );
   if (studentTopicId) await shot("09-student-topic-detail", `/student/topics/${studentTopicId}`);
+
+  // 管理员（密码通过 CAPTURE_ADMIN_PASSWORD 传入，不写入仓库；放在最后避免影响前面教师/学生截图）
+  if (process.env.CAPTURE_ADMIN_PASSWORD) {
+    await login("admin", process.env.CAPTURE_ADMIN_PASSWORD);
+    await shot("15-admin-dashboard", "/admin");
+  }
 });
 
 child.kill();
