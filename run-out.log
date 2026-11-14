@@ -1,0 +1,29 @@
+[SYS] 2026/11/08 - 10:39:07 | memory limit set to 21MB 
+[SYS] 2026/11/08 - 10:39:07 | SQL_DSN not set, using SQLite as database 
+[SYS] 2026/11/08 - 10:39:07 | database migration started 
+
+2026/11/08 10:39:07 [32mC:/Users/willi/go/pkg/mod/github.com/glebarez/sqlite@v1.11.0/migrator.go:342
+[0m[33m[0.000ms] [34;1m[rows:1][0m SELECT * FROM PRAGMA_index_list("options")
+[SYS] 2026/11/08 - 10:39:08 | system is not initialized and no root user exists 
+[SYS] 2026/11/08 - 10:39:08 | REDIS_CONN_STRING not set, Redis is not enabled 
+[SYS] 2026/11/08 - 10:39:08 | i18n initialized with languages: zh-CN, zh-TW, en 
+[SYS] 2026/11/08 - 10:39:08 | Loaded 0 custom OAuth providers 
+[SYS] 2026/11/08 - 10:39:08 | New API v0.0.0 started 
+[SYS] 2026/11/08 - 10:39:08 | updating dashboard data... 
+[INFO] 2026/11/08 - 10:39:08 | SYSTEM | codex credential auto-refresh task started: tick=10m0s threshold=24h0m0s 
+[INFO] 2026/11/08 - 10:39:08 | SYSTEM | workspace teacher wallet grant task started: tick=30m0s 
+[INFO] 2026/11/08 - 10:39:08 | SYSTEM | subscription quota reset task started: tick=1m0s 
+[INFO] 2026/11/08 - 10:39:08 | SYSTEM | system task runner started: runner=william-UCVavFN8 idle_interval=15s 
+[SYS] 2026/11/08 - 10:39:08 | saved dashboard data, 0 records 
+
+  [33mWarning: Refresh cookie is not secure and refresh/logout Origin validation is disabled. Please set SESSION_COOKIE_SECURE=true in production.[0m
+
+
+  [32mAI Workspace v0.0.0[0m  ready in 534 ms
+
+  ➜  [1mLocal:  [0m http://localhost:3002/
+  ➜  [1mNetwork:[0m http://192.168.1.50:3002/
+  ➜  [1mNetwork:[0m http://192.168.1.90:3002/
+  ➜  [1mNetwork:[0m http://192.168.159.1:3002/
+  ➜  [1mNetwork:[0m http://192.168.139.1:3002/
+

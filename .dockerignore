@@ -1,0 +1,22 @@
+.github
+.git
+*.md
+.vscode
+.gitignore
+Makefile
+docs
+.eslintcache
+.gocache
+/web/node_modules
+/web/dist
+!THIRD-PARTY-LICENSES.md
+
+# 运行时数据与密钥：绝不能进入构建上下文/镜像
+.env
+.env.*
+!.env.example
+/data
+/logs
+*.db
+*.log
+test
