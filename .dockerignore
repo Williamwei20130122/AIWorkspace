@@ -1,0 +1,67 @@
+# ===== 版本控制与编辑器元数据 =====
+.github
+.git
+.gitattributes
+.gitignore
+.vscode
+.idea
+.claude
+.cursor
+.zed
+.history
+.review
+.agents
+.plans
+.playwright-mcp
+
+# ===== 文档与部署编排文件（保留许可证，镜像 /licenses/ 需要）=====
+*.md
+!THIRD-PARTY-LICENSES.md
+docs
+Makefile
+makefile
+Dockerfile.dev
+docker-compose*.yml
+new-api.service
+
+# ===== 前端依赖与产物（构建时在容器内重新安装、重新编译）=====
+/web/node_modules
+/web/dist
+electron/node_modules
+electron/dist
+
+# ===== 运行时数据与密钥：绝不能进入构建上下文 / 镜像 =====
+.env
+.env.*
+!.env.example
+/data
+/logs
+upload
+tiktoken_cache
+*.db
+*.db-shm
+*.db-wal
+**/*.db
+**/*.db-shm
+**/*.db-wal
+*.log
+
+# ===== 本地大文件与产物：防止构建上下文膨胀、防止污染 =====
+*.exe
+**/*.exe
+newapi-linux-amd64
+newapi-linux-arm64
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+/bin/
+/e2e/
+.gocache
+.gomodcache
+.eslintcache
+go.work
+go.work.sum
+
+# ===== 测试 =====
+test

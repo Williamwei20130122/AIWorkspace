@@ -1,0 +1,87 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+import { parseCurrencyDisplayType } from '@/lib/currency'
+
+import { PricingSection } from '../general/pricing-section'
+import { QuotaSettingsSection } from '../general/quota-settings-section'
+import type { BillingSettings } from '../types'
+import { createSectionRegistry } from '../utils/section-registry'
+
+const BILLING_SECTIONS = [
+  {
+    id: 'quota',
+    titleKey: 'Quota Settings',
+    build: (settings: BillingSettings) => (
+      <QuotaSettingsSection
+        defaultValues={{
+          QuotaForNewUser: settings.QuotaForNewUser,
+          QuotaForInviter: settings.QuotaForInviter,
+          QuotaForInvitee: settings.QuotaForInvitee,
+          quota_setting: {
+            trust_quota_usd: settings['quota_setting.trust_quota_usd'],
+            pre_consume_multiplier:
+              settings['quota_setting.pre_consume_multiplier'],
+            enable_free_model_pre_consume:
+              settings['quota_setting.enable_free_model_pre_consume'],
+          },
+        }}
+      />
+    ),
+  },
+  {
+    id: 'currency',
+    titleKey: 'Currency & Display',
+    build: (settings: BillingSettings) => (
+      <PricingSection
+        defaultValues={{
+          QuotaPerUnit: settings.QuotaPerUnit,
+          DisplayInCurrencyEnabled: settings.DisplayInCurrencyEnabled,
+          DisplayTokenStatEnabled: settings.DisplayTokenStatEnabled,
+          general_setting: {
+            quota_display_type: parseCurrencyDisplayType(
+              settings['general_setting.quota_display_type']
+            ),
+            custom_currency_symbol:
+              settings['general_setting.custom_currency_symbol'] ?? '¤',
+            custom_currency_exchange_rate:
+              settings['general_setting.custom_currency_exchange_rate'] ?? 1,
+          },
+        }}
+      />
+    ),
+  },
+] as const
+
+export type BillingSectionId = (typeof BILLING_SECTIONS)[number]['id']
+
+const billingRegistry = createSectionRegistry<
+  BillingSectionId,
+  BillingSettings
+>({
+  sections: BILLING_SECTIONS,
+  defaultSection: 'quota',
+  basePath: '/system-settings/billing',
+  urlStyle: 'path',
+})
+
+export const BILLING_SECTION_IDS = billingRegistry.sectionIds
+export const BILLING_DEFAULT_SECTION = billingRegistry.defaultSection
+export const getBillingSectionNavItems = billingRegistry.getSectionNavItems
+export const getBillingSectionContent = billingRegistry.getSectionContent
+export const getBillingSectionMeta = billingRegistry.getSectionMeta

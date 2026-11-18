@@ -1,0 +1,115 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+
+/* 学生端工作台（/workspace）四款界面主题。
+   云朵泡泡为默认（:root 兜底），学生可在「账户管理 → 界面主题」中自行切换，
+   切换后 WorkspaceStudio 会把主题 id 写到 <html data-ws-theme="..."> 上。
+   仅使用 --ws-* 命名空间变量，不影响教师端/管理端配色。 */
+:root,
+[data-ws-theme='cloud'] {
+  /* 云朵泡泡（默认） */
+  --ws-bg: #f3faff;
+  --ws-surface: #fcfeff;
+  --ws-tint: #e8f5ff;
+  --ws-tint-2: #f4faff;
+  --ws-border: #d5ecff;
+  --ws-border-strong: #a9dcf7;
+  --ws-ink: #2a3b4d;
+  --ws-ink-2: #3c5266;
+  --ws-muted: #5a7488;
+  --ws-muted-2: #8fa6b8;
+  --ws-primary: #6ec8ff;
+  --ws-primary-text: #1565a0;
+  --ws-primary-hover: #4fb6f5;
+  --ws-primary-light: #a9e0ff;
+  --ws-primary-rgb: 110, 200, 255;
+  --ws-on: #0e3450;
+  --ws-aurora-1: rgba(110, 200, 255, 0.25);
+  --ws-aurora-2: rgba(198, 168, 255, 0.18);
+  --ws-aurora-3: rgba(56, 189, 248, 0.15);
+}
+
+[data-ws-theme='story'] {
+  /* 绘本世界 */
+  --ws-bg: #fdf6ec;
+  --ws-surface: #fffdf7;
+  --ws-tint: #fbefdd;
+  --ws-tint-2: #fdf7ec;
+  --ws-border: #ead9bf;
+  --ws-border-strong: #d9c29a;
+  --ws-ink: #4a3b2a;
+  --ws-ink-2: #66543f;
+  --ws-muted: #7d6b54;
+  --ws-muted-2: #a08d75;
+  --ws-primary: #e8836b;
+  --ws-primary-text: #c2503a;
+  --ws-primary-hover: #d96a50;
+  --ws-primary-light: #f2a995;
+  --ws-primary-rgb: 232, 131, 107;
+  --ws-on: #3e2418;
+  --ws-aurora-1: rgba(232, 131, 107, 0.2);
+  --ws-aurora-2: rgba(143, 191, 159, 0.16);
+  --ws-aurora-3: rgba(242, 169, 149, 0.18);
+}
+
+[data-ws-theme='juice'] {
+  /* 果汁工厂 */
+  --ws-bg: #fff9ec;
+  --ws-surface: #fffdf6;
+  --ws-tint: #fff2da;
+  --ws-tint-2: #fffaef;
+  --ws-border: #ffe6ad;
+  --ws-border-strong: #ffd186;
+  --ws-ink: #3b2e14;
+  --ws-ink-2: #574719;
+  --ws-muted: #77683f;
+  --ws-muted-2: #a8985f;
+  --ws-primary: #ff9a3d;
+  --ws-primary-text: #c25e00;
+  --ws-primary-hover: #f97e1f;
+  --ws-primary-light: #ffc078;
+  --ws-primary-rgb: 255, 154, 61;
+  --ws-on: #3b2408;
+  --ws-aurora-1: rgba(255, 154, 61, 0.22);
+  --ws-aurora-2: rgba(255, 93, 93, 0.15);
+  --ws-aurora-3: rgba(255, 200, 0, 0.16);
+}
+
+[data-ws-theme='quest'] {
+  /* 萌绿闯关 */
+  --ws-bg: #f4fbec;
+  --ws-surface: #fdfffa;
+  --ws-tint: #ecf8da;
+  --ws-tint-2: #f5fbec;
+  --ws-border: #d7eebd;
+  --ws-border-strong: #bde598;
+  --ws-ink: #22331a;
+  --ws-ink-2: #38492a;
+  --ws-muted: #5c7350;
+  --ws-muted-2: #8b9f80;
+  --ws-primary: #58cc02;
+  --ws-primary-text: #3b8200;
+  --ws-primary-hover: #46a302;
+  --ws-primary-light: #8fe04f;
+  --ws-primary-rgb: 88, 204, 2;
+  --ws-on: #16380a;
+  --ws-aurora-1: rgba(88, 204, 2, 0.18);
+  --ws-aurora-2: rgba(255, 200, 0, 0.16);
+  --ws-aurora-3: rgba(126, 217, 87, 0.16);
+}
